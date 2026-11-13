@@ -1,13 +1,13 @@
 # Kora — install and manage your development servers
 
-`kora` is a Windows/Linux/WSL terminal app with Kora lime colours, animated status,
+`kora` is a Linux x86-64 terminal app (including WSL 2) with Kora lime colours, animated status,
 version selectors, masked paste-capable inputs, and a server dashboard. Discover
 existing Kora installations, manage their Docker services, stage resource updates,
 or create another server with separate files, ports, database and Compose project.
 
 ## Prerequisites
 
-Use an **x86-64 Windows or Linux host** with Docker running Linux containers,
+Use an **x86-64 Linux host or WSL 2 distribution** with Docker running Linux containers,
 Docker Compose v2 (`docker compose`), and Git available in the same terminal as
 `kora`. The installer currently requires Docker; ARM hosts are not supported.
 Git is required for txAdmin recipes and keeps installed resources as editable
@@ -22,14 +22,11 @@ resource repositories you select.
    window, restart, and finish setting up your Linux user.
 2. Install and start [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
    Use its WSL 2 backend and Linux containers. Docker Desktop includes Compose.
-3. Choose where you will run Kora:
-   - **Native Windows:** install [Git for Windows](https://git-scm.com/install/windows),
-     reopen PowerShell, and use the Windows `kora.exe` binary.
-   - **Inside WSL:** enable your distribution under Docker Desktop's
-     **Settings → Resources → WSL Integration**, following the
-     [Docker WSL guide](https://docs.docker.com/desktop/features/wsl/).
-     Install Git and the shell download tools inside that distribution, then use
-     the Linux binary or the one-line shell installer there.
+3. Enable your distribution under Docker Desktop's **Settings → Resources →
+   WSL Integration**, following the [Docker WSL guide](https://docs.docker.com/desktop/features/wsl/).
+   Open that distribution's Linux terminal, install Git and download tools there,
+   and run the one-line installer below. Kora runs entirely inside WSL; there is
+   no native Windows executable to install.
 
 For Ubuntu/Debian inside WSL, the download tools and Git can be installed with:
 
@@ -56,7 +53,7 @@ sudo apt install git curl ca-certificates coreutils
 
 ### Verify before running Kora
 
-Run these in the **same PowerShell, WSL, or Linux terminal** you will use for Kora:
+Run these in the **same WSL or Linux terminal** you will use for Kora:
 
 ```sh
 git --version
@@ -96,15 +93,10 @@ when a terminal is available. Add `~/.local/bin` to PATH if instructed, then run
 kora
 ```
 
-**Release prerequisite:** the hosted command requires a published `kora-v*`
-release and anonymous access to the source and release assets. This repository is
-currently private, so the unauthenticated curl examples will not work yet. Use an
-authenticated source checkout and the source commands below until releases are
-available through the intended distribution channel.
-The workflow builds Linux and Windows binaries; pushing a `kora-v*` tag publishes
-`kora-linux-amd64`, `kora-windows-amd64.exe`, and their `.sha256` files.
-Native Windows users download the `.exe`, name it `kora.exe`, and place it in a
-user-owned directory on PATH. WSL users can use the shell command above.
+The workflow publishes a Linux x86-64 binary, its SHA-256 checksum, and a ZIP
+for each `kora-v*` release. On Windows, run the shell command inside WSL 2; Windows
+binaries are not built. Docker Desktop must expose its Linux engine to that WSL
+distribution. A release must be published before the download command works.
 
 Other bootstrap examples:
 
@@ -297,20 +289,19 @@ fields. Repository URLs must be credential-free GitHub HTTPS URLs.
 
 ## Prerequisites and versions
 
-Docker is required. The in-app checks verify Windows/Linux x86-64, Git, Docker CLI,
+Docker is required. The in-app checks verify Linux x86-64, Git, Docker CLI,
 Compose, local context and a running Linux x86-64 engine. They provide official
 help links and retry controls. Git is required for recipe mode. Authenticate Git
 for private Kora repositories before installing. No host Python or database is
 needed when using `kora`; Python runs inside the generated container.
 
-- Windows: [Docker Desktop setup](https://docs.docker.com/desktop/setup/install/windows-install/).
 - WSL: [Docker Desktop integration](https://docs.docker.com/desktop/features/wsl/) and
   [Microsoft WSL setup](https://learn.microsoft.com/en-us/windows/wsl/install).
 - Linux: [Docker Engine setup](https://docs.docker.com/engine/install/).
 
 Remote Docker contexts are unsupported because this installer relies on local bind
-mounts. WSL availability is advisory on native Windows if another working Linux
-Docker backend exists. The installer does not install system prerequisites or reboot.
+mounts. Kora must run inside Linux or WSL, with a working Linux
+Docker backend. The installer does not install system prerequisites or reboot.
 
 Game builds come from FiveM's documented Legacy build list; recommended Linux
 FXServer artifacts come from JG Scripts. These fields have selection lists with
@@ -367,7 +358,7 @@ source it or pass it directly to Compose; use `kora` or optional `start.py` with
 host Python 3. Public cfg files reference fresh private runtime credentials.
 Optional `--report` and `--secrets` exports have configurable relative JSON paths;
 these and `.env` are ignored by generated Git rules. Directories use private Linux
-permissions or Windows ACLs. Protect backups likewise.
+permissions. Protect backups likewise.
 
 Only completed installs receive `install.complete`. Failed directories are retained
 and cannot launch; choose a new name on retry. Existing databases and passwords are
@@ -388,7 +379,7 @@ sh -n install.sh
 
 Tests use local Git fixtures, simulated HTTP responses, temporary port bindings,
 and generated Compose configuration. The walkthrough renderer is opt-in and makes
-no network/installation calls. CI tests/builds Linux and Windows; live Windows/WSL,
+no network/installation calls. CI tests/builds Linux x86-64; live WSL,
 FXServer/resource compatibility and Docker Desktop still need target-host acceptance.
 
 Copyright © 2026 Kora Framework.

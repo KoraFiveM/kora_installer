@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install the GitHub Actions-built CLI without modifying any server directories.
 set -eu
-case "$(uname -s)/$(uname -m)" in Linux/x86_64|Linux/amd64) asset=kora-linux-amd64;; *) echo 'This script supports Linux/WSL x86-64. Download kora-windows-amd64.exe for native Windows.' >&2; exit 1;; esac
+case "$(uname -s)/$(uname -m)" in Linux/x86_64|Linux/amd64) asset=kora-linux-amd64;; *) echo 'This script supports Linux/WSL x86-64. On Windows, run this command inside a WSL 2 Linux distribution.' >&2; exit 1;; esac
 repo=KoraFiveM/kora_installer
 version=${KORA_VERSION:-latest}
 case "$version" in *[!A-Za-z0-9._-]*|'') echo 'Invalid KORA_VERSION' >&2; exit 1;; esac
