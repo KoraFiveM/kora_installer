@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "resources": [
+    {
+      "path": "[custom]/my_resource",
+      "repository": "https://github.com/example/my_resource.git",
+      "ref": "v1.0.0"
+    }
+  ],
+  "ensure": ["my_resource"]
+}
