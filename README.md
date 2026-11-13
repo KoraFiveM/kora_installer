@@ -5,6 +5,81 @@ version selectors, masked paste-capable inputs, and a server dashboard. Discover
 existing Kora installations, manage their Docker services, stage resource updates,
 or create another server with separate files, ports, database and Compose project.
 
+## Prerequisites
+
+Use an **x86-64 Windows or Linux host** with Docker running Linux containers,
+Docker Compose v2 (`docker compose`), and Git available in the same terminal as
+`kora`. The installer currently requires Docker; ARM hosts are not supported.
+Git is required for txAdmin recipes and keeps installed resources as editable
+repositories. Have your Cfx.re username and a license key from the
+[Cfx.re Portal](https://portal.cfx.re/) ready, plus GitHub access to any private
+resource repositories you select.
+
+### Windows / WSL
+
+1. Install or update [WSL 2 using Microsoft's guide](https://learn.microsoft.com/en-us/windows/wsl/install).
+   For a new installation, run `wsl --install` from an administrator PowerShell
+   window, restart, and finish setting up your Linux user.
+2. Install and start [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+   Use its WSL 2 backend and Linux containers. Docker Desktop includes Compose.
+3. Choose where you will run Kora:
+   - **Native Windows:** install [Git for Windows](https://git-scm.com/install/windows),
+     reopen PowerShell, and use the Windows `kora.exe` binary.
+   - **Inside WSL:** enable your distribution under Docker Desktop's
+     **Settings → Resources → WSL Integration**, following the
+     [Docker WSL guide](https://docs.docker.com/desktop/features/wsl/).
+     Install Git and the shell download tools inside that distribution, then use
+     the Linux binary or the one-line shell installer there.
+
+For Ubuntu/Debian inside WSL, the download tools and Git can be installed with:
+
+```sh
+sudo apt update
+sudo apt install git curl ca-certificates coreutils
+```
+
+### Linux
+
+1. Install Docker Engine using the official instructions for your distribution:
+   [Ubuntu](https://docs.docker.com/engine/install/ubuntu/),
+   [Debian](https://docs.docker.com/engine/install/debian/),
+   [Fedora](https://docs.docker.com/engine/install/fedora/), or
+   [other supported distributions](https://docs.docker.com/engine/install/).
+   Include the [Docker Compose plugin](https://docs.docker.com/compose/install/linux/).
+2. Start Docker and follow Docker's
+   [Linux post-installation guide](https://docs.docker.com/engine/install/linux-postinstall/)
+   so your normal user can access it. Docker-group membership grants root-level
+   privileges; use the access method appropriate for your host.
+3. Install [Git for Linux](https://git-scm.com/install/linux), a POSIX shell,
+   `curl` or `wget`, CA certificates, and `sha256sum` or `shasum`. The Ubuntu/Debian
+   command above installs Git and the tools used by the curl examples below.
+
+### Verify before running Kora
+
+Run these in the **same PowerShell, WSL, or Linux terminal** you will use for Kora:
+
+```sh
+git --version
+docker version
+docker compose version
+docker info --format '{{.OSType}}/{{.Architecture}}'
+```
+
+`docker version` must reach the server, Compose must report v2 or newer, and the
+last command should report `linux/x86_64` or `linux/amd64`. If Docker is unavailable,
+start Docker Desktop or the Docker Engine service; in WSL, check integration for
+the selected distribution. Kora also checks these prerequisites before installing.
+
+For private GitHub resources, configure Git credentials in that same environment.
+One option is to [install GitHub CLI](https://cli.github.com/) and run
+[`gh auth login`](https://cli.github.com/manual/gh_auth_login), then
+[`gh auth setup-git`](https://cli.github.com/manual/gh_auth_setup-git).
+
+The published binary does **not** require Go, Python, or a host database server.
+Docker provides the runtime and database. Building Kora from source requires
+[Go 1.26+](https://go.dev/doc/install); [Task](https://taskfile.dev/docs/installation)
+is optional. Python 3 is needed for the development tests, not normal CLI use.
+
 ## Install with one command
 
 Linux or WSL x86-64:
@@ -21,8 +96,11 @@ when a terminal is available. Add `~/.local/bin` to PATH if instructed, then run
 kora
 ```
 
-**Publication prerequisite:** these source changes and a `kora-v*` release must be
-published before the hosted command can work. This change does not publish a release.
+**Release prerequisite:** the hosted command requires a published `kora-v*`
+release and anonymous access to the source and release assets. This repository is
+currently private, so the unauthenticated curl examples will not work yet. Use an
+authenticated source checkout and the source commands below until releases are
+available through the intended distribution channel.
 The workflow builds Linux and Windows binaries; pushing a `kora-v*` tag publishes
 `kora-linux-amd64`, `kora-windows-amd64.exe`, and their `.sha256` files.
 Native Windows users download the `.exe`, name it `kora.exe`, and place it in a
