@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -239,10 +240,11 @@ func TestTagResolution(t *testing.T) {
 	}
 }
 func TestFlagsAndWizard(t *testing.T) {
-	c, seen, e := flags([]string{"--docker=true", "--txadmin=false", "--report=false", "--db-name=fresh", "--license-key=secret"}, io.Discard)
+	c, seen, e := flags([]string{"--docker=" + strconv.FormatBool(runtime.GOOS != "windows"), "--txadmin=false", "--report=false", "--db-name=fresh", "--license-key=secret"}, io.Discard)
 	if e != nil || !seen["docker"] || !seen["txadmin"] || c.DBAuto {
 		t.Fatal("explicit flags lost", e)
 	}
+	c.Docker = true // Exercise the Docker wizard independently of the host default.
 	m := newModel(c, seen)
 	m.step = 0
 	m.next()
