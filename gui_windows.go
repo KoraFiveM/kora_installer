@@ -23,6 +23,8 @@ import (
 )
 
 type setupGUI struct {
+	tabs                                     *walk.TabWidget
+	scanned                                  bool
 	window                                   *walk.MainWindow
 	pages                                    [6]*walk.Composite
 	heading, status                          *walk.Label
@@ -116,7 +118,7 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 		Children: []d.Widget{
 			d.Label{Text: "KORA / CONTROL", TextColor: walk.RGB(149, 255, 0), Font: d.Font{Family: "Segoe UI", PointSize: 24, Bold: true}},
 			guiLabel("Your FiveM server, one clear step at a time. Native Windows. Your files stay yours."),
-			d.TabWidget{Pages: []d.TabPage{
+			d.TabWidget{AssignTo: &g.tabs, Pages: []d.TabPage{
 				tabPage("Create a server",
 					d.Label{AssignTo: &g.heading, Text: "1 / 5 · Check your computer", TextColor: walk.RGB(149, 255, 0), Font: d.Font{PointSize: 15, Bold: true}},
 					d.ScrollView{Layout: d.VBox{}, Children: []d.Widget{
@@ -540,10 +542,19 @@ func (g *setupGUI) task(title string, work func(context.Context, func(Progress))
 	}()
 }
 func (g *setupGUI) checkComputer() {
+	if g.busy {
+		return
+	}
+	scan := !g.scanned
+	g.scanned = true
 	c := g.config
 	g.checked = false
 	g.task("Checking Windows, Git and the FiveM runtime", func(ctx context.Context, _ func(Progress)) (func(), error) {
 		checks := installationPrerequisites(ctx, c, currentHost(), runProbe)
+		var servers []Server
+		if scan {
+			servers = discoverServers(ctx, c)
+		}
 		return func() {
 			var lines []string
 			for _, check := range checks {
@@ -558,6 +569,12 @@ func (g *setupGUI) checkComputer() {
 			}
 			g.checks.SetText(strings.Join(lines, "\r\n"))
 			g.checked = checksReady(checks)
+			if scan {
+				g.populateServers(servers)
+				if len(g.servers) > 0 {
+					g.tabs.SetCurrentIndex(1)
+				}
+			}
 		}, nil
 	})
 }
@@ -592,20 +609,7 @@ func (g *setupGUI) findServers() {
 	g.task("Finding existing servers", func(ctx context.Context, _ func(Progress)) (func(), error) {
 		servers := discoverServers(ctx, c)
 		return func() {
-			g.servers = nil
-			names := []string{}
-			for _, s := range servers {
-				if regularFile(filepath.Join(s.Path, "native.json")) {
-					g.servers = append(g.servers, s)
-					names = append(names, filepath.Base(s.Path)+" — "+s.DockerState)
-				}
-			}
-			g.serversBox.SetModel(names)
-			if len(names) > 0 {
-				g.serversBox.SetCurrentIndex(0)
-			} else {
-				g.serverInfo.SetText("No native Windows servers found. Install one, or choose Find in another folder.")
-			}
+			g.populateServers(servers)
 		}, nil
 	})
 }
@@ -750,4 +754,21 @@ func (g *setupGUI) fitToScreen() {
 	height := min(g.window.SizePixels().Height, area.Height-16)
 	g.window.SetMinMaxSizePixels(walk.Size{Width: min(740, width), Height: min(480, height)}, walk.Size{})
 	g.window.SetBoundsPixels(walk.Rectangle{X: area.X + (area.Width-width)/2, Y: area.Y + (area.Height-height)/2, Width: width, Height: height})
+}
+
+func (g *setupGUI) populateServers(servers []Server) {
+	g.servers = nil
+	names := []string{}
+	for _, s := range servers {
+		if regularFile(filepath.Join(s.Path, "native.json")) {
+			g.servers = append(g.servers, s)
+			names = append(names, filepath.Base(s.Path)+" — "+s.DockerState)
+		}
+	}
+	g.serversBox.SetModel(names)
+	if len(names) > 0 {
+		g.serversBox.SetCurrentIndex(0)
+	} else {
+		g.serverInfo.SetText("No native Windows servers found. Install one, or choose Find in another folder.")
+	}
 }

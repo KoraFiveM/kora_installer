@@ -31,7 +31,7 @@ anything. If installation failed, correct the issue and choose a new directory.
 If only startup failed, use **Your servers** to inspect logs and retry Start.
 Cancelling readiness monitoring does not stop an already started server.
 
-**Your servers** discovers native installations and provides Start, Stop, Restart,
+Control opens **Your servers** automatically when native installations are found.\n**Your servers** discovers native installations and provides Start, Stop, Restart,
 logs, folder access and separately staged resource updates. Multiple servers keep
 their own folders, ports and databases. Stopping FiveM preserves the database.
 
