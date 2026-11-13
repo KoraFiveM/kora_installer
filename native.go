@@ -188,7 +188,7 @@ func nativeSession(root string) (*exec.Cmd, error) {
 		return nil, e
 	}
 	args := []string{"+set", "onesync", "on"}
-	cmd := exec.Command(filepath.Join(root, "artifacts", "FXServer.exe"))
+	cmd := backgroundCommand(exec.Command(filepath.Join(root, "artifacts", "FXServer.exe")))
 	cmd.Dir = filepath.Join(root, "server-data")
 	cmd.Env = os.Environ()
 	if values["TXADMIN_ENABLED"] == "true" {

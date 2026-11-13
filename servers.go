@@ -118,7 +118,7 @@ func discoverServersWith(ctx context.Context, c Config, run commandRunner) []Ser
 func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd := backgroundCommand(exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...))
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never", "GIT_OPTIONAL_LOCKS=0")
 	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err
