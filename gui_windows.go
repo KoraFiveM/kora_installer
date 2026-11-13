@@ -214,9 +214,9 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 				),
 			}},
 			d.Label{AssignTo: &g.status, Text: "Welcome to Kora", TextColor: walk.RGB(149, 255, 0), NoPrefix: true},
-			d.ProgressBar{AssignTo: &g.bar, MaxValue: 100},
-			d.TextEdit{AssignTo: &g.logs, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 55}, MaxSize: d.Size{Height: 85}, Font: d.Font{Family: "Consolas", PointSize: 9}},
-			d.Composite{Layout: d.HBox{}, Children: []d.Widget{d.Label{Text: "Activity log • credentials are hidden", TextColor: walk.RGB(225, 230, 222)}, d.HSpacer{}, d.PushButton{AssignTo: &g.cancel, Text: "Cancel current operation", Enabled: false, OnClicked: func() {
+			d.ProgressBar{AssignTo: &g.bar, MaxValue: 100, Visible: false},
+			d.TextEdit{AssignTo: &g.logs, Visible: false, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 55}, MaxSize: d.Size{Height: 85}, Font: d.Font{Family: "Consolas", PointSize: 9}},
+			d.Composite{Layout: d.HBox{}, Children: []d.Widget{d.Label{Text: "Kora Control • credentials are hidden", TextColor: walk.RGB(225, 230, 222)}, d.HSpacer{}, d.PushButton{AssignTo: &g.cancel, Text: "Cancel current operation", Enabled: false, OnClicked: func() {
 				if g.cancelWork != nil {
 					g.cancelWork()
 					g.status.SetText("Cancelling… please wait. Created files will be retained.")
@@ -478,6 +478,8 @@ func (g *setupGUI) task(title string, work func(context.Context, func(Progress))
 		return
 	}
 	g.busy = true
+	g.logs.SetVisible(true)
+	g.bar.SetVisible(true)
 	g.status.SetText(title)
 	g.bar.SetMarqueeMode(true)
 	g.next.SetEnabled(false)
@@ -537,6 +539,10 @@ func (g *setupGUI) task(title string, work func(context.Context, func(Progress))
 			} else {
 				g.status.SetText("Done — ready for the next step")
 				g.bar.SetValue(100)
+				if g.page < 5 {
+					g.logs.SetVisible(false)
+					g.bar.SetVisible(false)
+				}
 			}
 		})
 	}()
