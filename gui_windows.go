@@ -117,11 +117,11 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 		Background: d.SolidColorBrush{Color: walk.RGB(23, 23, 23)}, Font: d.Font{Family: "Segoe UI", PointSize: 10}, Layout: d.VBox{Margins: d.Margins{Left: 24, Top: 18, Right: 24, Bottom: 18}, Spacing: 12},
 		Children: []d.Widget{
 			d.Label{Text: "KORA / CONTROL", TextColor: walk.RGB(149, 255, 0), Font: d.Font{Family: "Segoe UI", PointSize: 24, Bold: true}},
-			guiLabel("Your FiveM server, one clear step at a time. Native Windows. Your files stay yours."),
-			d.TabWidget{AssignTo: &g.tabs, Pages: []d.TabPage{
+			d.Label{Text: "Your FiveM server, one clear step at a time. Native Windows. Your files stay yours.", TextColor: walk.RGB(225, 230, 222)},
+			d.TabWidget{AssignTo: &g.tabs, StretchFactor: 1, Pages: []d.TabPage{
 				tabPage("Create a server",
 					d.Label{AssignTo: &g.heading, Text: "1 / 5 · Check your computer", TextColor: walk.RGB(149, 255, 0), Font: d.Font{PointSize: 15, Bold: true}},
-					d.ScrollView{Layout: d.VBox{}, Children: []d.Widget{
+					d.ScrollView{StretchFactor: 1, Layout: d.VBox{}, Children: []d.Widget{
 						page(0,
 							guiLabel("First we check the tools FiveM needs. Nothing is installed or changed yet."),
 							d.TextEdit{AssignTo: &g.checks, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 170}},
@@ -216,7 +216,7 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 			d.Label{AssignTo: &g.status, Text: "Welcome to Kora", TextColor: walk.RGB(149, 255, 0), NoPrefix: true},
 			d.ProgressBar{AssignTo: &g.bar, MaxValue: 100},
 			d.TextEdit{AssignTo: &g.logs, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 55}, MaxSize: d.Size{Height: 85}, Font: d.Font{Family: "Consolas", PointSize: 9}},
-			d.Composite{Layout: d.HBox{}, Children: []d.Widget{guiLabel("Activity log • credentials are hidden"), d.HSpacer{}, d.PushButton{AssignTo: &g.cancel, Text: "Cancel current operation", Enabled: false, OnClicked: func() {
+			d.Composite{Layout: d.HBox{}, Children: []d.Widget{d.Label{Text: "Activity log • credentials are hidden", TextColor: walk.RGB(225, 230, 222)}, d.HSpacer{}, d.PushButton{AssignTo: &g.cancel, Text: "Cancel current operation", Enabled: false, OnClicked: func() {
 				if g.cancelWork != nil {
 					g.cancelWork()
 					g.status.SetText("Cancelling… please wait. Created files will be retained.")
