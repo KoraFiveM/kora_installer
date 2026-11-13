@@ -54,6 +54,11 @@ func targetPlatform(c Config) string {
 }
 func prepare(ctx context.Context, c Config, progress func(Progress)) (Plan, error) {
 	p := Plan{Config: c, Platform: targetPlatform(c)}
+	if !c.Docker && (c.WindowsService || c.DBSetup == "new-service") {
+		if err := nativePrivilegeCheck(); err != nil {
+			return p, err
+		}
+	}
 	if e := c.Validate(); e != nil {
 		return p, e
 	}
@@ -271,7 +276,7 @@ WORKDIR /srv/kora
 
 func generate(root string, p Plan) error {
 	c := p.Config
-	if e := os.Mkdir(filepath.Join(root, "resources"), 0700); e != nil {
+	if e := os.MkdirAll(nativeResources(root, c), 0700); e != nil {
 		return e
 	}
 	env, e := environment(c)
@@ -286,7 +291,7 @@ func generate(root string, p Plan) error {
 		b, _ := json.Marshal(env[k])
 		fmt.Fprintf(&dotenv, "%s=%s\n", k, b)
 	}
-	files := map[string]string{".env": dotenv.String(), ".compose-env": "", "start.py": launcher, "server-data/server.cfg": cfg(c, p.Ensure), ".gitignore": ".env\nreport.json\nsecrets.json\n/runtime/\n/database-data/\n/artifacts/\n/artifact.download\n/resource-*.zip\n/resource-updates/\n"}
+	files := map[string]string{".env": dotenv.String(), ".compose-env": "", "start.py": launcher, "server-data/server.cfg": cfg(c, p.Ensure), ".gitignore": ".env\ndatabase-admin.json\n/database/\n/kora.exe\nnative.json\nreport.json\nsecrets.json\n/runtime/\n/database-data/\n/artifacts/\n/artifact.download\n/resource-*.zip\n/resource-updates/\n"}
 	if p.TXRecipe != nil {
 		delete(files, "server-data/server.cfg")
 	}
@@ -324,6 +329,14 @@ func escapeIgnore(s string) string {
 }
 func install(ctx context.Context, p Plan, progress func(Progress)) (result Result) {
 	c := p.Config
+	if !c.Docker && runtime.GOOS != "windows" {
+		return Result{Err: errors.New("native installs require Windows; use Docker on Linux")}
+	}
+	if !c.Docker && (c.WindowsService || c.DBSetup == "new-service") {
+		if err := nativePrivilegeCheck(); err != nil {
+			return Result{Err: err}
+		}
+	}
 	if e := c.Validate(); e != nil {
 		return Result{Err: e}
 	}
@@ -368,7 +381,7 @@ func install(ctx context.Context, p Plan, progress func(Progress)) (result Resul
 	if c.Docker {
 		e = validateTarXZProgress(artifact, emit)
 	} else if p.Platform == "windows" {
-		e = extractZipProgress(artifact, artifacts, false, emit)
+		e = extractWindowsArtifact(artifact, artifacts, emit)
 	} else {
 		e = extractTarXZProgress(artifact, artifacts, emit)
 	}
@@ -388,7 +401,7 @@ func install(ctx context.Context, p Plan, progress func(Progress)) (result Resul
 			return fail(e)
 		}
 		progress(Progress{"Installing " + r.Path, i + 2, total})
-		dest := filepath.Join(root, "resources", filepath.FromSlash(r.Path))
+		dest := filepath.Join(nativeResources(root, c), filepath.FromSlash(r.Path))
 		if e = prepareCloneDestination(root, dest); e != nil {
 			return fail(e)
 		}
@@ -427,7 +440,20 @@ func install(ctx context.Context, p Plan, progress func(Progress)) (result Resul
 		return fail(err)
 	}
 	progress(Progress{"Creating isolated database", total - 1, total})
+	var native nativeInstallation
 	if !c.Docker {
+		native, e = installNativeFiles(root, c)
+		if e != nil {
+			return fail(e)
+		}
+		if c.DBSetup == "new-service" {
+			if e = installMariaDB(ctx, root, &c, native, progress); e != nil {
+				return fail(e)
+			}
+		}
+		if e = waitDatabase(ctx, c); e != nil {
+			return fail(e)
+		}
 		if e = createDatabase(ctx, c); e != nil {
 			return fail(e)
 		}
@@ -452,6 +478,11 @@ func install(ctx context.Context, p Plan, progress func(Progress)) (result Resul
 		if e = writeNew(root, "catalog-source.json", jsonBytes(struct {
 			Source string `json:"source"`
 		}{c.CatalogSource}), 0600); e != nil {
+			return fail(e)
+		}
+	}
+	if !c.Docker {
+		if e = registerFXService(root, native); e != nil {
 			return fail(e)
 		}
 	}

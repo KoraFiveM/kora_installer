@@ -65,6 +65,9 @@ func dockerCommand(ctx context.Context, root string, args ...string) (*exec.Cmd,
 
 func checkPorts(c Config) error {
 	ports := []int{c.CFXPort}
+	if !c.Docker && c.DBSetup == "new-service" {
+		ports = append(ports, c.DBPort)
+	}
 	if c.TXAdmin {
 		ports = append(ports, c.TXPort)
 	}
@@ -94,7 +97,7 @@ func serverConfig(root string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	c := Config{Docker: true, Adminer: values["ADMINER_ENABLED"] == "true", DBName: values["DB_NAME"], DBUser: values["DB_USER"], TXAdmin: values["TXADMIN_ENABLED"] == "true", DBExposePort: values["DB_EXPOSE_PORT"] == "true"}
+	c := Config{Docker: values["DOCKER"] != "false", Adminer: values["ADMINER_ENABLED"] == "true", DBName: values["DB_NAME"], DBUser: values["DB_USER"], TXAdmin: values["TXADMIN_ENABLED"] == "true", DBExposePort: values["DB_EXPOSE_PORT"] == "true"}
 	for key, dest := range map[string]*int{"CFX_PORT": &c.CFXPort, "TXADMIN_PORT": &c.TXPort, "DB_HOST_PORT": &c.DBHostPort, "ADMINER_PORT": &c.AdminerPort} {
 		if (key == "DB_HOST_PORT" && !c.DBExposePort) || (key == "ADMINER_PORT" && !c.Adminer) {
 			continue
@@ -124,6 +127,7 @@ func checkEnteredPort(c Config, key string, port int) error {
 		enabled   bool
 	}{
 		{"cfx-port", "FiveM", c.CFXPort, true},
+		{"db-port", "new MariaDB service", c.DBPort, !c.Docker && c.DBSetup == "new-service"},
 		{"tx-port", "txAdmin", c.TXPort, c.TXAdmin},
 		{"db-host-port", "database", c.DBHostPort, c.DBExposePort},
 		{"adminer-port", "Adminer", c.AdminerPort, c.Adminer},

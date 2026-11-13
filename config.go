@@ -11,11 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 )
 
 type Config struct {
+	WindowsService  bool
+	DBSetup         string
+	MariaDBVersion  string
 	CatalogSource   string
 	DirectoryName   string
 	Yes             bool
@@ -96,7 +100,7 @@ func defaults() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{CatalogSource: defaultCatalogURL, RecipeInput: "bundled", Docker: true, TXPort: 40120, AdminerPort: 8080, DBType: "maria", DBAuto: true, DBHostPort: 3306, DBName: "kora_" + id, DBUser: "kora_" + id, DBPassword: pass, DBHost: "127.0.0.1", DBPort: 3306, DBAdmin: "root", CFXPort: 30120, Hostname: host, GameBuild: "latest", Artifact: "recommended", KoraTag: "latest", Output: filepath.Join(home, "KoraServers"), ReportPath: "report.json", SecretsPath: "secrets.json"}, nil
+	return Config{CatalogSource: defaultCatalogURL, RecipeInput: "bundled", Docker: runtime.GOOS != "windows", DBSetup: nativeDBDefault(), MariaDBVersion: "11.4.13", TXPort: 40120, AdminerPort: 8080, DBType: "maria", DBAuto: true, DBHostPort: 3306, DBName: "kora_" + id, DBUser: "kora_" + id, DBPassword: pass, DBHost: "127.0.0.1", DBPort: 3306, DBAdmin: "root", CFXPort: 30120, Hostname: host, GameBuild: "latest", Artifact: "recommended", KoraTag: "latest", Output: filepath.Join(home, "KoraServers"), ReportPath: "report.json", SecretsPath: "secrets.json"}, nil
 }
 
 func flags(args []string, out io.Writer) (Config, map[string]bool, error) {
@@ -108,12 +112,15 @@ func flags(args []string, out io.Writer) (Config, map[string]bool, error) {
 	f.SetOutput(out)
 	f.StringVar(&c.CatalogSource, "resources", c.CatalogSource, "resources.json local path or HTTP(S)/GitHub URL")
 	f.BoolVar(&c.Yes, "yes", false, "Run unattended; accept the resolved installation plan")
-	f.BoolVar(&c.Start, "start", false, "Start Docker detached after unattended installation")
+	f.BoolVar(&c.Start, "start", false, "Start the installed server after unattended installation")
 	f.StringVar(&c.DirectoryName, "name", "", "New installation directory name under --output; existing names fail")
 	f.StringVar(&c.RecipeInput, "recipe", c.RecipeInput, "txAdmin YAML file, GitHub URL, or bundled; Git required")
 	f.StringVar(&c.Server, "server", "", "Inspect an existing server directory in the TUI")
 	f.StringVar(&c.WriteTemplate, "write-template", "", "Create a base resource template at this new path after TUI confirmation")
-	f.BoolVar(&c.Docker, "docker", c.Docker, "Docker is required for now")
+	f.BoolVar(&c.WindowsService, "windows-service", false, "Register FXServer as an automatic Windows service (requires elevation)")
+	f.StringVar(&c.DBSetup, "db-setup", c.DBSetup, "Native database: new-service (MariaDB) or existing (MariaDB/MySQL)")
+	f.StringVar(&c.MariaDBVersion, "mariadb-version", c.MariaDBVersion, "Official MariaDB Windows ZIP version for a new service")
+	f.BoolVar(&c.Docker, "docker", c.Docker, "Use Docker on Linux; Windows uses native FXServer")
 	f.BoolVar(&c.TXAdmin, "txadmin", c.TXAdmin, "Enable txAdmin")
 	f.IntVar(&c.TXPort, "tx-port", c.TXPort, "txAdmin port")
 	f.StringVar(&c.DBType, "db-type", c.DBType, "maria or mysql")
@@ -177,8 +184,11 @@ func flags(args []string, out io.Writer) (Config, map[string]bool, error) {
 	if c.Server != "" && (c.WriteTemplate != "" || c.Template != "") {
 		return c, nil, errors.New("--server cannot be combined with --template or --write-template; templates customize new installations")
 	}
-	if !c.Docker {
-		return c, nil, errors.New("Docker mode is required; --docker=false is unavailable")
+	if runtime.GOOS != "windows" && !c.Docker {
+		return c, nil, errors.New("native installation is for Windows; use Docker on Linux")
+	}
+	if runtime.GOOS == "windows" && c.Docker {
+		return c, nil, errors.New("Windows installations are native; omit --docker")
 	}
 	seen := map[string]bool{}
 	f.Visit(func(f *flag.Flag) { seen[f.Name] = true })
@@ -222,7 +232,24 @@ func (c Config) Validate() error {
 	}
 
 	if !c.Docker {
-		return errors.New("native installs are unavailable; Docker is required")
+		if c.Adminer || c.DBExposePort {
+			return errors.New("Adminer and Docker database port publishing are unavailable in native mode")
+		}
+		if c.DBSetup != "existing" && c.DBSetup != "new-service" {
+			return errors.New("native db-setup must be existing or new-service")
+		}
+		if c.DBSetup == "new-service" && (c.DBType != "maria" || c.DBHost != "127.0.0.1") {
+			return errors.New("new-service installs local MariaDB; use existing for MySQL or remote databases")
+		}
+		if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(c.MariaDBVersion) {
+			return errors.New("MariaDB version must be major.minor.patch")
+		}
+	}
+	if !c.Docker && c.DBSetup == "new-service" && (c.DBPort == c.CFXPort || (c.TXAdmin && c.DBPort == c.TXPort)) {
+		return errors.New("new MariaDB service needs a port different from FiveM and txAdmin")
+	}
+	if c.Docker && c.WindowsService {
+		return errors.New("windows-service is only available for native Windows installations")
 	}
 	if c.DBType != "maria" && c.DBType != "mysql" {
 		return errors.New("Kora supports maria or mysql")
@@ -317,4 +344,11 @@ func loadRecipe(path string) (Recipe, error) {
 		}
 	}
 	return r, nil
+}
+
+func nativeDBDefault() string {
+	if runtime.GOOS == "windows" {
+		return "new-service"
+	}
+	return "existing"
 }

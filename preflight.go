@@ -108,3 +108,27 @@ func checksReady(checks []Check) bool {
 	}
 	return true
 }
+
+func installationPrerequisites(ctx context.Context, c Config, h hostPlatform, run commandRunner) []Check {
+	if c.Docker {
+		return prerequisites(ctx, h, run)
+	}
+	checks := []Check{{Name: "Native Windows", Detail: h.OS + " / " + h.Arch, Blocked: h.OS != "windows" || h.Arch != "amd64", Help: "https://docs.fivem.net/docs/server-manual/setting-up-a-server-vanilla/"}}
+	git, e := run(ctx, "git", "--version")
+	if e != nil {
+		git = "Install Git for Windows and reopen this terminal"
+	}
+	checks = append(checks, Check{Name: "Git", Detail: git, Blocked: e != nil, Help: "https://git-scm.com/install/windows"})
+	// FXServer requires the Microsoft VC++ x64 runtime; do not substitute WSL/Docker checks.
+	_, e = run(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", `if (Test-Path "$env:SystemRoot\System32\vcruntime140.dll") { 'installed' } else { exit 1 }`)
+	checks = append(checks, Check{Name: "Visual C++ x64 runtime", Detail: map[bool]string{true: "Installed", false: "Install the Microsoft Visual C++ x64 Redistributable, then retry"}[e == nil], Blocked: e != nil, Help: "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist"})
+	if c.WindowsService || c.DBSetup == "new-service" {
+		e = nativePrivilegeCheck()
+		detail := "Service registration permissions available"
+		if e != nil {
+			detail = e.Error()
+		}
+		checks = append(checks, Check{Name: "Administrator", Detail: detail, Warning: e != nil, Help: "https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/"})
+	}
+	return checks
+}
