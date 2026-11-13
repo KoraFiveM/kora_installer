@@ -124,6 +124,9 @@ func artifactURL(address, platform string) error {
 	prefix, suffix := "/artifacts/fivem/build_proot_linux/master/", "/fx.tar.xz"
 	if platform == "windows" {
 		prefix, suffix = "/artifacts/fivem/build_server_windows/master/", "/server.zip"
+		if strings.HasSuffix(u.Path, "/server.7z") {
+			suffix = "/server.7z"
+		}
 	}
 	if !strings.HasPrefix(u.Path, prefix) || !strings.HasSuffix(u.Path, suffix) || strings.Contains(u.Path, "..") {
 		return errors.New("artifact URL does not match target platform")

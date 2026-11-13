@@ -8,10 +8,29 @@ import (
 	"fmt"
 	"golang.org/x/term"
 	"os"
+	"path/filepath"
 	"time"
 )
 
 func run() int {
+	if len(os.Args) == 3 && (os.Args[1] == "--native-run" || os.Args[1] == "--native-service" || os.Args[1] == "--native-start") {
+		root, err := filepath.Abs(os.Args[2])
+		if err == nil {
+			if os.Args[1] == "--native-service" {
+				err = nativeServiceRun(root)
+			} else if os.Args[1] == "--native-start" {
+				err = nativeAction(context.Background(), root, "start")
+			} else {
+				err = nativeRun(context.Background(), root)
+			}
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Native startup failed:", err)
+			return 1
+		}
+		return 0
+	}
+
 	c, seen, e := flags(os.Args[1:], os.Stderr)
 	if errors.Is(e, flag.ErrHelp) {
 		return 0
@@ -72,7 +91,7 @@ func runUnattended(c Config) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
-	checks := prerequisites(ctx, currentHost(), runProbe)
+	checks := installationPrerequisites(ctx, c, currentHost(), runProbe)
 	for _, check := range checks {
 		fmt.Println(check.Name + ": " + check.Detail)
 		if check.Blocked {

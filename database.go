@@ -60,3 +60,22 @@ func provisionDatabase(ctx context.Context, db *sql.DB, c Config) error {
 	}
 	return nil
 }
+
+func waitDatabase(ctx context.Context, c Config) error {
+	deadline := time.NewTimer(90 * time.Second)
+	defer deadline.Stop()
+	for {
+		conn, e := net.DialTimeout("tcp", net.JoinHostPort(c.DBHost, strconv.Itoa(c.DBPort)), time.Second)
+		if e == nil {
+			conn.Close()
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return errors.New("database service did not become reachable; inspect its retained data directory and Windows Services")
+		case <-time.After(time.Second):
+		}
+	}
+}
