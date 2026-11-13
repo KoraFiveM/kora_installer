@@ -38,6 +38,16 @@ func TestControlWindow(t *testing.T) {
 		}
 	}
 	g.show(1)
+	g.edit("db-port").SetText("not-a-port")
+	if _, err := g.readConfig(); err != nil {
+		t.Fatalf("hidden database field blocked earlier page: %v", err)
+	}
+	g.show(2)
+	if _, err := g.readConfig(); err == nil {
+		t.Fatal("invalid visible database port accepted")
+	}
+	g.edit("db-port").SetText("3306")
+	g.show(1)
 	g.edit("hostname").SetText("My first FiveM server")
 	g.edit("cfx-user").SetText("your-cfx-username")
 	g.status.SetText("Preview with simulated values — no installation started")
