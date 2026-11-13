@@ -106,7 +106,9 @@ is printed directly and the command exits automatically after readiness or failu
 
 ## Walkthrough video
 
-[Watch the generated Kora walkthrough](docs/walkthrough.mp4)
+https://github.com/user-attachments/assets/f9fcef93-b42f-4fcc-ba95-dc23fe99fd70
+
+[Download the walkthrough MP4](docs/walkthrough.mp4)
 
 This video uses the actual Bubble Tea view rendering with demo data. Readiness
 checks, clone progress and server operations are simulated; it does not depict a
