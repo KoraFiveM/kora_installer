@@ -4,7 +4,9 @@ import os
 from pathlib import Path
 import zipfile
 
-binary = Path("dist") / os.environ["INSTALLER_BINARY"]
+if os.environ["INSTALLER_TARGET"] != "linux-amd64" or os.environ["INSTALLER_BINARY"] != "kora":
+    raise SystemExit("Only Linux x86-64 releases are supported")
+binary = Path("dist") / "kora"
 archive = binary.parent / f"kora_installer-{os.environ['INSTALLER_TARGET']}.zip"
 with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as output:
     output.write(binary, binary.name)
@@ -18,7 +20,7 @@ with (binary.parent / "SHA256SUMS").open("x", encoding="utf-8") as output:
 
 # Stable raw asset names consumed by install.sh, in addition to downloadable ZIPs.
 import shutil
-asset_name = "kora-" + os.environ["INSTALLER_TARGET"] + (".exe" if binary.suffix == ".exe" else "")
+asset_name = "kora-linux-amd64"
 asset = binary.parent / asset_name
 shutil.copyfile(binary, asset)
 asset.chmod(0o755)

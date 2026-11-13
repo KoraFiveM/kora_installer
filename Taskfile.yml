@@ -1,9 +1,5 @@
 version: '3'
 
-vars:
-  EXE: '{{if eq OS "windows"}}.exe{{end}}'
-  PYTHON: '{{if eq OS "windows"}}py -3{{else}}python3{{end}}'
-
 tasks:
   default:
     silent: true
@@ -11,15 +7,19 @@ tasks:
       - task --list
 
   build:
-    desc: Build the installer for the current platform
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: '0'
+    desc: Build the installer for Linux x86-64
     cmds:
-      - go build -trimpath -o dist/kora{{.EXE}} .
+      - go build -trimpath -o dist/kora .
 
   test:
     desc: Run Go tests and offline launcher tests
     cmds:
       - go test ./...
-      - '{{.PYTHON}} -m unittest discover -s assets -p "test_*.py" -v'
+      - python3 -m unittest discover -s assets -p 'test_*.py' -v
 
   test:race:
     desc: Run Go tests with the race detector
@@ -49,15 +49,6 @@ tasks:
       CGO_ENABLED: '0'
     cmds:
       - go build -trimpath -o dist/kora-linux-amd64 .
-
-  build:windows:
-    desc: Cross-build for Windows x86-64
-    env:
-      GOOS: windows
-      GOARCH: amd64
-      CGO_ENABLED: '0'
-    cmds:
-      - go build -trimpath -o dist/kora-windows-amd64.exe .
 
   run:
     desc: Run the interactive installer
