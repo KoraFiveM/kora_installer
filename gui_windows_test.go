@@ -57,6 +57,13 @@ func TestControlWindow(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 		g.window.Synchronize(func() {
 			b := g.edit("license").Bounds()
+			area, ok := controlWorkArea(g.window)
+			if ok {
+				bounds := g.window.BoundsPixels()
+				if bounds.Y+bounds.Height > area.Y+area.Height {
+					t.Errorf("window exceeds work area: %+v vs %+v", bounds, area)
+				}
+			}
 			if !win.IsWindowVisible(g.edit("license").Handle()) {
 				t.Error("license input is not visible in Windows")
 			}

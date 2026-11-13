@@ -14,9 +14,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/lxn/walk"
 	d "github.com/lxn/walk/declarative"
+	"github.com/lxn/win"
 	"golang.org/x/sys/windows"
 )
 
@@ -30,7 +32,8 @@ type setupGUI struct {
 	edits                                    map[string]**walk.LineEdit
 	choices                                  map[string]**walk.ComboBox
 	tx, service, report, secrets, start      *walk.CheckBox
-	existing, manager                        *walk.Composite
+	existing                                 *walk.Composite
+	manager                                  *walk.ScrollView
 	serversBox                               *walk.ComboBox
 	servers                                  []Server
 	config                                   Config
@@ -63,7 +66,7 @@ func (g *setupGUI) combo(key string) *walk.ComboBox { return *g.choices[key] }
 func (g *setupGUI) input(key, label, value string, password bool) d.Widget {
 	slot := new(*walk.LineEdit)
 	g.edits[key] = slot
-	return d.Composite{Layout: d.Grid{Columns: 2}, Children: []d.Widget{
+	return d.Composite{Layout: d.Grid{Columns: 2, MarginsZero: true}, Children: []d.Widget{
 		d.Label{Text: label, TextColor: walk.RGB(225, 230, 222), MinSize: d.Size{Width: 180}, NoPrefix: true},
 		d.LineEdit{AssignTo: slot, Text: value, PasswordMode: password, StretchFactor: 1, Accessibility: d.Accessibility{Name: label}},
 	}}
@@ -71,7 +74,7 @@ func (g *setupGUI) input(key, label, value string, password bool) d.Widget {
 func (g *setupGUI) choice(key, label string, values []string, current int) d.Widget {
 	slot := new(*walk.ComboBox)
 	g.choices[key] = slot
-	return d.Composite{Layout: d.Grid{Columns: 2}, Children: []d.Widget{
+	return d.Composite{Layout: d.Grid{Columns: 2, MarginsZero: true}, Children: []d.Widget{
 		d.Label{Text: label, TextColor: walk.RGB(225, 230, 222), MinSize: d.Size{Width: 180}, NoPrefix: true},
 		d.ComboBox{AssignTo: slot, Model: values, CurrentIndex: current, Accessibility: d.Accessibility{Name: label}},
 	}}
@@ -101,15 +104,20 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 	page := func(i int, children ...d.Widget) d.Widget {
 		return d.Composite{AssignTo: &g.pages[i], Visible: i == 0, Layout: d.VBox{}, Children: children}
 	}
+	tabPage := func(title string, children ...d.Widget) d.TabPage {
+		return d.TabPage{Title: title, Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, Layout: d.VBox{MarginsZero: true}, Children: []d.Widget{
+			d.Composite{Background: d.SolidColorBrush{Color: walk.RGB(23, 23, 23)}, Layout: d.VBox{}, Children: children},
+		}}
+	}
 	link := func(label, url string) d.Widget { return d.PushButton{Text: label, OnClicked: func() { g.open(url) }} }
 	err := (d.MainWindow{
-		AssignTo: &g.window, Title: "Kora Control • FiveM server management", Size: d.Size{Width: 980, Height: 820}, MinSize: d.Size{Width: 780, Height: 640},
+		AssignTo: &g.window, Title: "Kora Control • FiveM server management", Size: d.Size{Width: 980, Height: 820}, MinSize: d.Size{Width: 740, Height: 480},
 		Background: d.SolidColorBrush{Color: walk.RGB(23, 23, 23)}, Font: d.Font{Family: "Segoe UI", PointSize: 10}, Layout: d.VBox{Margins: d.Margins{Left: 24, Top: 18, Right: 24, Bottom: 18}, Spacing: 12},
 		Children: []d.Widget{
 			d.Label{Text: "KORA / CONTROL", TextColor: walk.RGB(149, 255, 0), Font: d.Font{Family: "Segoe UI", PointSize: 24, Bold: true}},
 			guiLabel("Your FiveM server, one clear step at a time. Native Windows. Your files stay yours."),
 			d.TabWidget{Pages: []d.TabPage{
-				{Title: "Create a server", Background: d.SolidColorBrush{Color: walk.RGB(23, 23, 23)}, Layout: d.VBox{}, Children: []d.Widget{
+				tabPage("Create a server",
 					d.Label{AssignTo: &g.heading, Text: "1 / 5 · Check your computer", TextColor: walk.RGB(149, 255, 0), Font: d.Font{PointSize: 15, Bold: true}},
 					d.ScrollView{Layout: d.VBox{}, Children: []d.Widget{
 						page(0,
@@ -184,9 +192,9 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 					d.Composite{Layout: d.HBox{}, Children: []d.Widget{
 						d.PushButton{AssignTo: &g.back, Text: "Back", Enabled: false, OnClicked: g.goBack}, d.HSpacer{}, d.PushButton{AssignTo: &g.next, Text: "Continue", Enabled: false, OnClicked: g.advance},
 					}},
-				}},
-				{Title: "Your servers", Background: d.SolidColorBrush{Color: walk.RGB(23, 23, 23)}, Layout: d.VBox{}, Children: []d.Widget{
-					d.Composite{AssignTo: &g.manager, Layout: d.VBox{}, Children: []d.Widget{
+				),
+				tabPage("Your servers",
+					d.ScrollView{AssignTo: &g.manager, Layout: d.VBox{}, Children: []d.Widget{
 						guiLabel("Manage existing native Windows servers. No delete or reset buttons."),
 						d.Composite{Layout: d.HBox{}, Children: []d.Widget{d.PushButton{Text: "Find my servers", OnClicked: g.findServers}, d.PushButton{Text: "Find in another folder…", OnClicked: g.findOther}}},
 						d.ComboBox{AssignTo: &g.serversBox, OnCurrentIndexChanged: g.selectServer},
@@ -201,11 +209,11 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 						d.PushButton{Text: "Stage resource updates in a NEW folder…", OnClicked: func() { g.serverAction("update") }},
 						guiLabel("Updates keep Git history and never replace live resources. Review the staged folder before adopting it."),
 					}},
-				}},
+				),
 			}},
 			d.Label{AssignTo: &g.status, Text: "Welcome to Kora", TextColor: walk.RGB(149, 255, 0), NoPrefix: true},
 			d.ProgressBar{AssignTo: &g.bar, MaxValue: 100},
-			d.TextEdit{AssignTo: &g.logs, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 100}, MaxSize: d.Size{Height: 140}, Font: d.Font{Family: "Consolas", PointSize: 9}},
+			d.TextEdit{AssignTo: &g.logs, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 55}, MaxSize: d.Size{Height: 85}, Font: d.Font{Family: "Consolas", PointSize: 9}},
 			d.Composite{Layout: d.HBox{}, Children: []d.Widget{guiLabel("Activity log • credentials are hidden"), d.HSpacer{}, d.PushButton{AssignTo: &g.cancel, Text: "Cancel current operation", Enabled: false, OnClicked: func() {
 				if g.cancelWork != nil {
 					g.cancelWork()
@@ -224,6 +232,7 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 			g.notice("An operation is still running", "Use Cancel current operation and wait before closing. Created files and database data are retained.")
 		}
 	})
+	g.fitToScreen()
 	return g, nil
 }
 
@@ -722,4 +731,23 @@ func backgroundCommand(cmd *exec.Cmd) *exec.Cmd {
 	}
 	cmd.SysProcAttr.HideWindow = true
 	return cmd
+}
+
+func controlWorkArea(window *walk.MainWindow) (walk.Rectangle, bool) {
+	info := win.MONITORINFO{CbSize: uint32(unsafe.Sizeof(win.MONITORINFO{}))}
+	if !win.GetMonitorInfo(win.MonitorFromWindow(window.Handle(), win.MONITOR_DEFAULTTONEAREST), &info) {
+		return walk.Rectangle{}, false
+	}
+	r := info.RcWork
+	return walk.Rectangle{X: int(r.Left), Y: int(r.Top), Width: int(r.Right - r.Left), Height: int(r.Bottom - r.Top)}, true
+}
+func (g *setupGUI) fitToScreen() {
+	area, ok := controlWorkArea(g.window)
+	if !ok {
+		return
+	}
+	width := min(g.window.SizePixels().Width, area.Width-16)
+	height := min(g.window.SizePixels().Height, area.Height-16)
+	g.window.SetMinMaxSizePixels(walk.Size{Width: min(740, width), Height: min(480, height)}, walk.Size{})
+	g.window.SetBoundsPixels(walk.Rectangle{X: area.X + (area.Width-width)/2, Y: area.Y + (area.Height-height)/2, Width: width, Height: height})
 }
