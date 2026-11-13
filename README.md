@@ -43,7 +43,9 @@ Prerequisite installation and firewall/router setup remain explicit user actions
 local readiness does not prove that players can connect from the internet.
 
 For source validation on Windows, generate the manifest using `task build:gui`,
-then run `go test -race -tags gui ./...`. The native window test uses synthetic
+then run `go test -race -gcflags="github.com/lxn/...=-d=checkptr=0" -tags gui ./...`.
+The package-scoped exception handles Win32 integer resource IDs in the upstream
+toolkit; Kora code retains pointer checks and race detection. The native window test uses synthetic
 data and creates no services or real servers. CI captures a test-window preview
 as the `kora-control-preview` artifact. Visual accessibility, high-DPI behavior,
 UAC and real MariaDB/FXServer installation still need target-host acceptance.

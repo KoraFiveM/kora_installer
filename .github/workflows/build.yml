@@ -35,7 +35,9 @@ jobs:
         if: runner.os == 'Windows'
         env:
           KORA_GUI_SCREENSHOT: ${{ runner.temp }}/kora-control.png
-        run: go test -race -tags gui -timeout 3m ./...
+        # Win32 MAKEINTRESOURCE uses integer pseudo-pointers. Limit the exception
+        # to the upstream Win32 toolkit; Kora code keeps checkptr and race checks.
+        run: go test -race -gcflags="github.com/lxn/...=-d=checkptr=0" -tags gui -timeout 3m ./...
       - name: Check GUI code
         if: runner.os == 'Windows'
         run: go vet -tags gui ./...
