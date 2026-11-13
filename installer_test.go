@@ -26,6 +26,7 @@ func validConfig(t *testing.T) Config {
 	if e != nil {
 		t.Fatal(e)
 	}
+	c.Docker = true // Shared fixtures exercise Docker consistently on every test host.
 	c.License = "test-license-SENSITIVE"
 	c.CFXUser = "test-user"
 	c.DBAdminPassword = "admin-SENSITIVE"
