@@ -8,8 +8,12 @@ on:
 permissions:
   contents: read
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
@@ -22,32 +26,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check formatting
-        run: test -z "$(gofmt -l *.go)"
-      - name: Offline Go tests
-        run: go test -race ./...
-      - name: Vet
-        run: go vet ./...
-      - name: Offline launcher tests
-        run: python -m unittest discover -s assets -p 'test_*.py' -v
-      - name: Build
-        env:
-          CGO_ENABLED: '0'
-          GOOS: linux
-          GOARCH: amd64
-        run: go build -trimpath -ldflags='-s -w' -o dist/kora .
-      - name: Package with checksum
-        env:
-          INSTALLER_BINARY: kora
-          INSTALLER_TARGET: linux-amd64
-        run: python package_release.py
+      - run: test -z "$(gofmt -l *.go)"
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: python -m unittest discover -s assets -p 'test_*.py' -v
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and package Linux and Windows CLIs in Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.build
+          target: artifacts
+          outputs: type=local,dest=dist
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - uses: actions/upload-artifact@v4
         with:
-          name: kora_installer-linux-amd64
-          path: |
-            dist/*.zip
-            dist/SHA256SUMS
-            dist/kora-linux-amd64*
+          name: kora-release
+          path: dist/
           if-no-files-found: error
 
   release:
@@ -59,15 +61,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: kora-release
           path: artifacts
-      - name: Publish verified CLI binaries
+      - name: Publish verified native CLI binaries
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          cd artifacts/kora_installer-linux-amd64
-          sha256sum --check kora-linux-amd64.sha256
-          sha256sum --check SHA256SUMS
-          gh release create "$RELEASE_TAG" --draft --verify-tag --title "$RELEASE_TAG" --notes "Kora CLI for Linux x86-64, including WSL 2. Run inside your Linux distribution with Docker Desktop WSL integration enabled. Checksums are included." kora-linux-amd64 kora-linux-amd64.sha256 kora_installer-linux-amd64.zip SHA256SUMS
+          (cd artifacts/linux-amd64 && sha256sum --check kora-linux-amd64.sha256 && sha256sum --check SHA256SUMS)
+          (cd artifacts/windows-amd64 && sha256sum --check kora_installer.exe.sha256 && sha256sum --check SHA256SUMS)
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "$RELEASE_TAG" --notes "Native Windows installer and Linux Docker-server CLI, built in Docker. Checksums included. Windows runtime does not require Docker, WSL or Python." artifacts/linux-amd64/kora-linux-amd64 artifacts/linux-amd64/kora-linux-amd64.sha256 artifacts/linux-amd64/kora_installer-linux-amd64.zip artifacts/windows-amd64/kora_installer.exe artifacts/windows-amd64/kora_installer.exe.sha256 artifacts/windows-amd64/kora_installer-windows-amd64.zip
           gh release edit "$RELEASE_TAG" --draft=false --latest

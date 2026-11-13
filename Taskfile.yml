@@ -50,6 +50,20 @@ tasks:
     cmds:
       - go build -trimpath -o dist/kora-linux-amd64 .
 
+  build:windows:
+    desc: Cross-build the native Windows installer
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -trimpath -o dist/kora_installer.exe .
+
+  build:docker:
+    desc: Build both release binaries and checksums in Docker
+    cmds:
+      - docker buildx build -f Dockerfile.build --target artifacts --output type=local,dest=dist .
+
   run:
     desc: Run the interactive installer
     cmds:

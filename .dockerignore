@@ -1,0 +1,13 @@
+**
+!*.go
+!go.mod
+!go.sum
+!package_release.py
+!README.md
+!template.example.json
+!templates/
+!templates/*.json
+!assets/
+!assets/start.py
+!assets/resources.manifest
+!assets/txadmin-recipe.yaml
