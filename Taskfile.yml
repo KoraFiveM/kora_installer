@@ -1,0 +1,75 @@
+version: '3'
+
+vars:
+  EXE: '{{if eq OS "windows"}}.exe{{end}}'
+  PYTHON: '{{if eq OS "windows"}}py -3{{else}}python3{{end}}'
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the installer for the current platform
+    cmds:
+      - go build -trimpath -o dist/kora{{.EXE}} .
+
+  test:
+    desc: Run Go tests and offline launcher tests
+    cmds:
+      - go test ./...
+      - '{{.PYTHON}} -m unittest discover -s assets -p "test_*.py" -v'
+
+  test:race:
+    desc: Run Go tests with the race detector
+    cmds:
+      - go test -race ./...
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  fmt:
+    desc: Format Go source files
+    cmds:
+      - gofmt -w *.go
+
+  check:fmt:
+    desc: Check Go formatting without changing files
+    cmds:
+      - test -z "$(gofmt -l *.go)"
+
+  build:linux:
+    desc: Cross-build for Linux x86-64
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -trimpath -o dist/kora-linux-amd64 .
+
+  build:windows:
+    desc: Cross-build for Windows x86-64
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -trimpath -o dist/kora-windows-amd64.exe .
+
+  run:
+    desc: Run the interactive installer
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  servers:
+    desc: Open the installer to inspect an existing server (task servers -- --server=PATH)
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  template:
+    desc: Export an editable base template after TUI confirmation
+    cmds:
+      - go run . --write-template=kora-template.json {{.CLI_ARGS}}
