@@ -1,37 +1,35 @@
 #!/bin/sh
-# Install the GitHub Actions-built CLI without modifying any server directories.
+# Build the CLI from Git source without requiring a published release.
 set -eu
-case "$(uname -s)/$(uname -m)" in Linux/x86_64|Linux/amd64) asset=kora-linux-amd64;; *) echo 'This script supports Linux/WSL x86-64. Download kora-windows-amd64.exe for native Windows.' >&2; exit 1;; esac
+case "$(uname -s)/$(uname -m)" in Linux/x86_64|Linux/amd64) true;; *) echo 'This script supports Linux/WSL x86-64. For native Windows, clone the repository and run go build -o kora.exe .' >&2; exit 1;; esac
 repo=KoraFiveM/kora_installer
-version=${KORA_VERSION:-latest}
-case "$version" in *[!A-Za-z0-9._-]*|'') echo 'Invalid KORA_VERSION' >&2; exit 1;; esac
-base="https://github.com/$repo/releases/latest/download"
-if [ "$version" != latest ]; then base="https://github.com/$repo/releases/download/$version"; fi
+ref=${KORA_REF:-${KORA_VERSION:-main}}
+[ "$ref" != latest ] || ref=main
+case "$ref" in -*|*[!A-Za-z0-9._/-]*|'') echo 'Invalid KORA_REF (use a branch or tag)' >&2; exit 1;; esac
+for tool in git go; do
+ if ! command -v "$tool" >/dev/null 2>&1; then
+  echo "Install $tool first. Git: https://git-scm.com/install/ · Go 1.26+: https://go.dev/doc/install" >&2
+  exit 1
+ fi
+done
 bin_dir=${KORA_BIN_DIR:-"$HOME/.local/bin"}
 mkdir -p "$bin_dir"
 if [ -e "$bin_dir/kora" ] || [ -L "$bin_dir/kora" ]; then echo "Already installed: $bin_dir/kora. Run it directly; this installer never overwrites an existing binary." >&2; exit 1; fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/kora-install.XXXXXXXX")
 staged=''
 trap 'rm -rf "$work"; if [ -n "$staged" ]; then rm -f "$staged"; fi' EXIT HUP INT TERM
-fetch() {
- if command -v curl >/dev/null 2>&1; then curl -fSL --proto '=https' --tlsv1.2 "$1" -o "$2"
- elif command -v wget >/dev/null 2>&1; then wget -q "$1" -O "$2"
- else echo 'Install curl or wget first.' >&2; exit 1; fi
-}
-if ! fetch "$base/$asset" "$work/$asset"; then
- echo "Unable to download $asset. Verify a kora-v* release has been published at https://github.com/$repo/releases." >&2
+printf 'Cloning %s (%s)…\n' "$repo" "$ref"
+if ! git clone --depth 1 --single-branch --branch "$ref" "https://github.com/$repo.git" "$work/source"; then
+ echo 'Unable to clone source. Check the branch/tag and GitHub access; private repositories need Git credentials (gh auth login && gh auth setup-git).' >&2
  exit 1
 fi
-fetch "$base/$asset.sha256" "$work/checksum"
-expected=$(awk 'NR==1 {print $1}' "$work/checksum")
-case "$expected" in *[!a-fA-F0-9]*|'') echo 'Invalid checksum file' >&2; exit 1;; esac
-[ "${#expected}" -eq 64 ] || { echo 'Invalid checksum length' >&2; exit 1; }
-if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$work/$asset" | awk '{print $1}')
-elif command -v shasum >/dev/null 2>&1; then actual=$(shasum -a 256 "$work/$asset" | awk '{print $1}')
-else echo 'Install sha256sum or shasum first.' >&2; exit 1; fi
-[ "$actual" = "$expected" ] || { echo 'Checksum mismatch; binary was not installed.' >&2; exit 1; }
+printf 'Building kora from source (requires Go 1.26+; the first build may download the toolchain and modules)…\n'
+if ! (cd "$work/source" && GOWORK=off GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -mod=readonly -trimpath -o "$work/kora" .); then
+ echo 'Source build failed. Install Go 1.26+ from https://go.dev/doc/install and check network access for Go modules. Nothing was installed.' >&2
+ exit 1
+fi
 staged=$(mktemp "$bin_dir/.kora.XXXXXXXX")
-cat "$work/$asset" > "$staged"
+cat "$work/kora" > "$staged"
 chmod 755 "$staged"
 # Exclusive hard-link creation prevents replacement even if another installer races us.
 ln "$staged" "$bin_dir/kora"
