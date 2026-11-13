@@ -11,3 +11,5 @@
 !assets/start.py
 !assets/resources.manifest
 !assets/txadmin-recipe.yaml
+
+!assets/control.manifest
