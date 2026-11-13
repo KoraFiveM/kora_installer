@@ -42,6 +42,9 @@ func run() int {
 	if c.Yes {
 		return runUnattended(c)
 	}
+	if handled, code := launchGUI(c); handled {
+		return code
+	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		fmt.Fprintln(os.Stderr, "kora requires an interactive terminal. Flags prefill the TUI; review and confirmation remain interactive.")
 		return 2
