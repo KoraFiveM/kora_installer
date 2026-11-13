@@ -9,3 +9,6 @@ kora-template.json
 
 /kora
 /kora.exe
+
+/*.syso
+/kora-control.exe

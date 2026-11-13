@@ -27,7 +27,24 @@ jobs:
         with:
           python-version: '3.12'
       - run: test -z "$(gofmt -l *.go)"
+      - name: Embed Windows GUI manifest
+        if: runner.os == 'Windows'
+        run: go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest assets/control.manifest -o control_windows_amd64.syso
       - run: go test -race ./...
+      - name: Test native Kora Control widgets and shared backend
+        if: runner.os == 'Windows'
+        env:
+          KORA_GUI_SCREENSHOT: ${{ runner.temp }}/kora-control.png
+        run: go test -race -tags gui -timeout 3m ./...
+      - name: Check GUI code
+        if: runner.os == 'Windows'
+        run: go vet -tags gui ./...
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && always()
+        with:
+          name: kora-control-preview
+          path: ${{ runner.temp }}/kora-control.png
+          if-no-files-found: warn
       - run: go vet ./...
       - run: python -m unittest discover -s assets -p 'test_*.py' -v
 
@@ -37,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build and package Linux and Windows CLIs in Docker
+      - name: Build and package Linux CLI and Windows applications in Docker
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -70,6 +87,6 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           (cd artifacts/linux-amd64 && sha256sum --check kora-linux-amd64.sha256 && sha256sum --check SHA256SUMS)
-          (cd artifacts/windows-amd64 && sha256sum --check kora_installer.exe.sha256 && sha256sum --check SHA256SUMS)
-          gh release create "$RELEASE_TAG" --draft --verify-tag --title "$RELEASE_TAG" --notes "Native Windows installer and Linux Docker-server CLI, built in Docker. Checksums included. Windows runtime does not require Docker, WSL or Python." artifacts/linux-amd64/kora-linux-amd64 artifacts/linux-amd64/kora-linux-amd64.sha256 artifacts/linux-amd64/kora_installer-linux-amd64.zip artifacts/windows-amd64/kora_installer.exe artifacts/windows-amd64/kora_installer.exe.sha256 artifacts/windows-amd64/kora_installer-windows-amd64.zip
+          (cd artifacts/windows-amd64 && sha256sum --check kora_installer.exe.sha256 && sha256sum --check kora-control.exe.sha256 && sha256sum --check SHA256SUMS)
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "$RELEASE_TAG" --notes "Kora Control Windows GUI, native Windows CLI and Linux Docker-server CLI, built in Docker. Checksums included. Windows runtime does not require Docker, WSL or Python." artifacts/linux-amd64/kora-linux-amd64 artifacts/linux-amd64/kora-linux-amd64.sha256 artifacts/linux-amd64/kora_installer-linux-amd64.zip artifacts/windows-amd64/kora_installer.exe artifacts/windows-amd64/kora_installer.exe.sha256 artifacts/windows-amd64/kora_installer-windows-amd64.zip artifacts/windows-amd64/kora-control.exe artifacts/windows-amd64/kora-control.exe.sha256
           gh release edit "$RELEASE_TAG" --draft=false --latest

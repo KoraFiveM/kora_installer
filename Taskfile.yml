@@ -59,6 +59,16 @@ tasks:
     cmds:
       - go build -trimpath -o dist/kora_installer.exe .
 
+  build:gui:
+    desc: Build Kora Control for Windows x86-64 (no browser runtime)
+    cmds:
+      - go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest assets/control.manifest -o control_windows_amd64.syso
+      - cmd: go build -tags gui -trimpath -ldflags="-H windowsgui" -o dist/kora-control.exe .
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+
   build:docker:
     desc: Build both release binaries and checksums in Docker
     cmds:

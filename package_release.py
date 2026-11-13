@@ -12,6 +12,8 @@ binary = Path("dist") / expected[target]
 archive = binary.parent / f"kora_installer-{os.environ['INSTALLER_TARGET']}.zip"
 with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as output:
     output.write(binary, binary.name)
+    if target == "windows-amd64":
+        output.write(binary.parent / "kora-control.exe", "kora-control.exe")
     output.write("README.md")
     output.write("template.example.json")
     output.write("templates/base.json")
@@ -28,3 +30,7 @@ if binary != asset:
     shutil.copyfile(binary, asset)
 asset.chmod(0o755)
 asset.with_name(asset.name + ".sha256").write_text(hashlib.sha256(asset.read_bytes()).hexdigest() + "  " + asset.name + "\n", encoding="utf-8")
+
+if target == "windows-amd64":
+    gui = binary.parent / "kora-control.exe"
+    gui.with_name(gui.name + ".sha256").write_text(hashlib.sha256(gui.read_bytes()).hexdigest() + "  " + gui.name + "\n", encoding="utf-8")

@@ -1,11 +1,13 @@
-# Build distributable CLIs only. Native Windows servers do not use Docker.
+# Build distributable applications only. Native Windows servers do not use Docker.
 FROM --platform=linux/amd64 golang:1.26-bookworm AS compile
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+RUN go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest assets/control.manifest -o control_windows_amd64.syso
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o /binaries/linux/kora . && \
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o /binaries/windows/kora_installer.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o /binaries/windows/kora_installer.exe . && \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags gui -trimpath -ldflags="-s -w -H windowsgui" -o /binaries/windows/kora-control.exe .
 
 FROM python:3.12-slim AS package
 WORKDIR /src
@@ -17,9 +19,9 @@ RUN mkdir -p dist /out/linux-amd64 /out/windows-amd64 && \
     cp /binaries/linux/kora dist/kora && \
     INSTALLER_BINARY=kora INSTALLER_TARGET=linux-amd64 python package_release.py && \
     cp dist/kora-linux-amd64 dist/kora-linux-amd64.sha256 dist/kora_installer-linux-amd64.zip dist/SHA256SUMS /out/linux-amd64/ && \
-    rm -rf dist && mkdir dist && cp /binaries/windows/kora_installer.exe dist/kora_installer.exe && \
+    rm -rf dist && mkdir dist && cp /binaries/windows/*.exe dist/ && \
     INSTALLER_BINARY=kora_installer.exe INSTALLER_TARGET=windows-amd64 python package_release.py && \
-    cp dist/kora_installer.exe dist/kora_installer.exe.sha256 dist/kora_installer-windows-amd64.zip dist/SHA256SUMS /out/windows-amd64/
+    cp dist/*.exe dist/*.sha256 dist/kora_installer-windows-amd64.zip dist/SHA256SUMS /out/windows-amd64/
 
 FROM scratch AS artifacts
 COPY --from=package /out/ /
