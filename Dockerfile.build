@@ -1,0 +1,25 @@
+# Build distributable CLIs only. Native Windows servers do not use Docker.
+FROM --platform=linux/amd64 golang:1.26-bookworm AS compile
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o /binaries/linux/kora . && \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o /binaries/windows/kora_installer.exe .
+
+FROM python:3.12-slim AS package
+WORKDIR /src
+COPY --from=compile /src/package_release.py /src/README.md /src/template.example.json ./
+COPY --from=compile /src/templates ./templates
+COPY --from=compile /src/assets/txadmin-recipe.yaml ./assets/txadmin-recipe.yaml
+COPY --from=compile /binaries /binaries
+RUN mkdir -p dist /out/linux-amd64 /out/windows-amd64 && \
+    cp /binaries/linux/kora dist/kora && \
+    INSTALLER_BINARY=kora INSTALLER_TARGET=linux-amd64 python package_release.py && \
+    cp dist/kora-linux-amd64 dist/kora-linux-amd64.sha256 dist/kora_installer-linux-amd64.zip dist/SHA256SUMS /out/linux-amd64/ && \
+    rm -rf dist && mkdir dist && cp /binaries/windows/kora_installer.exe dist/kora_installer.exe && \
+    INSTALLER_BINARY=kora_installer.exe INSTALLER_TARGET=windows-amd64 python package_release.py && \
+    cp dist/kora_installer.exe dist/kora_installer.exe.sha256 dist/kora_installer-windows-amd64.zip dist/SHA256SUMS /out/windows-amd64/
+
+FROM scratch AS artifacts
+COPY --from=package /out/ /
