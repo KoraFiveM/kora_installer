@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lxn/walk"
+	"github.com/lxn/win"
 )
 
 // Real native widgets, synthetic data only: no prerequisites, services or networks.
@@ -55,11 +57,16 @@ func TestControlWindow(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 		g.window.Synchronize(func() {
 			b := g.edit("license").Bounds()
+			if !win.IsWindowVisible(g.edit("license").Handle()) {
+				t.Error("license input is not visible in Windows")
+			}
 			if b.Width < 100 || b.Height < 10 {
 				t.Errorf("license input has invalid layout: %+v", b)
 			}
 			if target := os.Getenv("KORA_GUI_SCREENSHOT"); target != "" {
-				bitmap, err := walk.NewBitmapFromWindow(g.window)
+				// Capture the visible desktop pixels, not WM_PRINT (native tabs paint
+				// their backing control over their child pages in that printing path).
+				bitmap, err := controlScreenshot(g.window)
 				if err != nil {
 					t.Error(err)
 				} else {
@@ -91,4 +98,26 @@ func TestControlWindow(t *testing.T) {
 		})
 	}()
 	g.window.Run()
+}
+
+func controlScreenshot(window *walk.MainWindow) (*walk.Bitmap, error) {
+	bounds := window.BoundsPixels()
+	bitmap, err := walk.NewBitmapForDPI(walk.Size{Width: bounds.Width, Height: bounds.Height}, window.DPI())
+	if err != nil {
+		return nil, err
+	}
+	canvas, err := walk.NewCanvasFromImage(bitmap)
+	if err != nil {
+		bitmap.Dispose()
+		return nil, err
+	}
+	screen := win.GetDC(0)
+	ok := win.BitBlt(canvas.HDC(), 0, 0, int32(bounds.Width), int32(bounds.Height), screen, int32(bounds.X), int32(bounds.Y), win.SRCCOPY)
+	win.ReleaseDC(0, screen)
+	canvas.Dispose()
+	if !ok {
+		bitmap.Dispose()
+		return nil, fmt.Errorf("cannot capture native window")
+	}
+	return bitmap, nil
 }
