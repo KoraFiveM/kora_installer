@@ -75,8 +75,8 @@ One option is to [install GitHub CLI](https://cli.github.com/) and run
 [`gh auth login`](https://cli.github.com/manual/gh_auth_login), then
 [`gh auth setup-git`](https://cli.github.com/manual/gh_auth_setup-git).
 
-The published binary does **not** require Go, Python, or a host database server.
-Docker provides the runtime and database. Building Kora from source requires
+The shell installer currently builds from source, so install Git and Go first.
+Docker provides the runtime and database; no host database is required. Building requires
 [Go 1.26+](https://go.dev/doc/install); [Task](https://taskfile.dev/docs/installation)
 is optional. Python 3 is needed for the development tests, not normal CLI use.
 
@@ -88,23 +88,27 @@ Linux or WSL x86-64:
 curl -fsSL https://raw.githubusercontent.com/KoraFiveM/kora_installer/HEAD/install.sh | sh -s --
 ```
 
-The script downloads a **GitHub Actions-built binary**, verifies its SHA-256 checksum,
-and installs **`~/.local/bin/kora`**. No Go compiler is needed. It opens the dashboard
-when a terminal is available. Add `~/.local/bin` to PATH if instructed, then run:
+The script clones `main`, builds the CLI with **Go 1.26+**, and installs
+**`~/.local/bin/kora`**. It does not download release binaries or depend on GitHub
+Actions. The first build downloads Go modules (and may download the required Go
+toolchain). Existing binaries and server directories are never overwritten.
+It opens the dashboard when a terminal is available. Add `~/.local/bin` to PATH
+if instructed, then run `kora`.
+
+The curl command needs anonymous access to `install.sh`; if the repository is
+private, use an authenticated checkout instead:
 
 ```sh
-kora
+gh auth login
+gh auth setup-git
+gh repo clone KoraFiveM/kora_installer
+cd kora_installer
+sh install.sh
 ```
 
-**Release prerequisite:** the hosted command requires a published `kora-v*`
-release and anonymous access to the source and release assets. This repository is
-currently private, so the unauthenticated curl examples will not work yet. Use an
-authenticated source checkout and the source commands below until releases are
-available through the intended distribution channel.
-The workflow builds Linux and Windows binaries; pushing a `kora-v*` tag publishes
-`kora-linux-amd64`, `kora-windows-amd64.exe`, and their `.sha256` files.
-Native Windows users download the `.exe`, name it `kora.exe`, and place it in a
-user-owned directory on PATH. WSL users can use the shell command above.
+Native Windows users can use the same authenticated checkout and run
+`go build -o kora.exe .` in PowerShell, then place `kora.exe` in a user-owned
+PATH directory. WSL users run the shell installer inside their distribution.
 
 Other bootstrap examples:
 
@@ -112,13 +116,15 @@ Other bootstrap examples:
 # Install the CLI without opening it.
 curl -fsSL https://raw.githubusercontent.com/KoraFiveM/kora_installer/HEAD/install.sh | sh -s -- --install-only
 
-# Pin an available release and choose a user bin directory.
-curl -fsSL https://raw.githubusercontent.com/KoraFiveM/kora_installer/HEAD/install.sh | KORA_VERSION=kora-v1.0.0 KORA_BIN_DIR="$HOME/bin" sh -s -- --install-only
+# Select a source branch or tag and choose a user bin directory.
+curl -fsSL https://raw.githubusercontent.com/KoraFiveM/kora_installer/HEAD/install.sh | KORA_REF=main KORA_BIN_DIR="$HOME/bin" sh -s -- --install-only
 ```
 
-`kora-v1.0.0` above is an example: substitute a published tag. Existing binaries are
-never overwritten. To replace an older CLI, move it aside yourself first. The
-script needs curl or wget and sha256sum or shasum. Server directories are untouched.
+`KORA_REF` selects a source branch or tag and defaults to `main`. The older
+`KORA_VERSION` variable is accepted as an alias; `latest` maps to `main`.
+Existing binaries are never overwritten. To replace an older CLI, move it aside
+first. The bootstrap requires Git, Go, and a POSIX shell; curl is used by the
+one-line download command. Server directories are untouched.
 
 ## One-line server installations, including license keys
 
