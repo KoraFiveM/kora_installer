@@ -1,0 +1,11 @@
+/dist/
+/kora_installer
+/kora_installer.exe
+.env
+report.json
+secrets.json
+__pycache__/
+kora-template.json
+
+/kora
+/kora.exe
