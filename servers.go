@@ -50,7 +50,7 @@ func discoverServersWith(ctx context.Context, c Config, run commandRunner) []Ser
 			return
 		}
 		seen[abs] = true
-		if !regularFile(filepath.Join(abs, "compose.yaml")) {
+		if !regularFile(filepath.Join(abs, "compose.yaml")) && !regularFile(filepath.Join(abs, "native.json")) {
 			return
 		}
 		managed := regularFile(filepath.Join(abs, "start.py")) && regularFile(filepath.Join(abs, "server-data", "server.cfg"))
@@ -104,6 +104,11 @@ func discoverServersWith(ctx context.Context, c Config, run commandRunner) []Ser
 					}
 				}
 			}
+		}
+	}
+	for i := range found {
+		if regularFile(filepath.Join(found[i].Path, "native.json")) {
+			found[i].DockerState = nativeStatus(found[i].Path)
 		}
 	}
 	sort.Slice(found, func(i, j int) bool { return found[i].Path < found[j].Path })

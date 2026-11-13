@@ -26,7 +26,16 @@ func (m *model) startChecks(after string) tea.Cmd {
 	m.stage, m.afterChecks, m.err, m.notice, m.scroll = "checking", after, "", "", 0
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	m.cancel = cancel
-	return func() tea.Msg { defer cancel(); return checksMsg(prerequisites(ctx, currentHost(), runProbe)) }
+	c := m.config
+	if after == "launch" {
+		if saved, err := serverConfig(m.result.Folder); err == nil {
+			c = saved
+		}
+	}
+	return func() tea.Msg {
+		defer cancel()
+		return checksMsg(installationPrerequisites(ctx, c, currentHost(), runProbe))
+	}
 }
 
 func (m *model) managerWork(kind string) tea.Cmd {
@@ -204,7 +213,7 @@ func (m model) updateManager(msg tea.Msg) (model, tea.Cmd, bool) {
 				if err == nil {
 					err = checkPorts(c)
 				}
-				if err == nil {
+				if err == nil && c.Docker {
 					cmd, e := dockerCommand(ctx, root, "config", "--quiet")
 					err = e
 					if err == nil {
@@ -331,9 +340,9 @@ func (m model) managerView(width int) (string, string, bool) {
 	case "server-action":
 		return title.Render(strings.ToUpper(m.serverAction)+" SERVER?") + "\n\n" + wrap(m.actionRoot) + "\n\n" + wrap("This affects only the selected installation. Stop preserves its containers, resources and database. Logs show the last 100 lines."), "enter confirm   esc cancel", true
 	case "server-working":
-		return m.spinner.View() + " Applying server action…", "Please wait; Docker command has a timeout", true
+		return m.spinner.View() + " Applying server action…", "Please wait; Commands have a timeout", true
 	case "checking", "launch-check":
-		return m.spinner.View() + "  Verifying host and Docker readiness…\n\n" + dim.Render("Read-only checks; each command has a timeout."), "ctrl+c cancel", true
+		return m.spinner.View() + "  Verifying host prerequisites…\n\n" + dim.Render("Read-only checks; each command has a timeout."), "ctrl+c cancel", true
 	case "preflight":
 		out := title.Render("SYSTEM CHECK") + "\n\n"
 		for i, c := range m.checks {
