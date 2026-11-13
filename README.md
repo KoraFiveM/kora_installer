@@ -1,9 +1,52 @@
-# Kora — install and manage your development servers
+# Kora Control — create and manage FiveM development servers
 
-`kora` installs native Windows x86-64 servers or Docker-based Linux servers, with Kora lime colours, animated status,
-version selectors, masked paste-capable inputs, and a server dashboard. Discover
-existing Kora installations, manage their Docker services, stage resource updates,
-or create another server with separate files, ports, database and Compose project.
+**Kora Control** is the Windows desktop app for creating and managing native FiveM
+servers. The **`kora`** command remains available for terminal users and Linux hosts.
+Both interfaces share the same installation, validation and server-management code.
+
+## Windows desktop app
+
+Build with `task build:gui`, then double-click `dist/kora-control.exe`. Tagged
+releases built with this workflow include `kora-control.exe` and its SHA-256
+checksum, alongside the existing CLI. Older releases may contain only the CLI.
+No browser runtime, Go, Docker, WSL or Python is required to run Control.
+
+The **Create a server** wizard walks through five steps:
+
+1. **Check your computer** — prerequisite status, official Git/VC++ download
+   links, retry, and an optional Windows Administrator restart.
+2. **Name your server** — choose a parent folder, a new directory name and a
+   player-facing name. Open the Cfx.re portal and paste your license into a masked
+   native input. Select ports or use **Find available ports**.
+3. **Database & startup** — create a private MariaDB service (recommended), or
+   use an existing MariaDB/MySQL service. Optionally run FiveM as a Windows service.
+4. **Optional settings** — keep current defaults, choose available versions, or
+   supply a local/web resources.json or supported txAdmin recipe.
+5. **Review & install** — see the destination and resolved versions before any
+   installation starts. The final choice is whether to start the server afterwards.
+
+Activity runs in the background with progress and a redacted log. Cancellation
+retains created files and database objects; it does not roll them back or delete
+anything. If installation failed, correct the issue and choose a new directory.
+If only startup failed, use **Your servers** to inspect logs and retry Start.
+Cancelling readiness monitoring does not stop an already started server.
+
+**Your servers** discovers native installations and provides Start, Stop, Restart,
+logs, folder access and separately staged resource updates. Multiple servers keep
+their own folders, ports and databases. Stopping FiveM preserves the database.
+
+The app uses native Windows controls with Kora charcoal/lime branding, keyboard
+navigation, standard paste, a folder picker and a DPI-aware manifest. It uses
+[Walk](https://github.com/lxn/walk) with Go; no JavaScript frontend or WebView2
+installation is needed. Service creation requires Administrator permission.
+Prerequisite installation and firewall/router setup remain explicit user actions;
+local readiness does not prove that players can connect from the internet.
+
+For source validation on Windows, generate the manifest using `task build:gui`,
+then run `go test -race -tags gui ./...`. The native window test uses synthetic
+data and creates no services or real servers. CI captures a test-window preview
+as the `kora-control-preview` artifact. Visual accessibility, high-DPI behavior,
+UAC and real MariaDB/FXServer installation still need target-host acceptance.
 
 ## Prerequisites
 
@@ -421,7 +464,7 @@ docker buildx build -f Dockerfile.build --target artifacts --output type=local,d
 ```
 
 Outputs are under `dist/linux-amd64/` and `dist/windows-amd64/`, including
-`kora_installer.exe`, ZIP archives, and checksums. This does not start servers or
+`kora-control.exe` (GUI), `kora_installer.exe` (CLI), ZIP archives, and checksums. This does not start servers or
 publish a release. `task build:windows` cross-builds just the Windows executable.
 Windows SCM and MariaDB service registration still require live acceptance on a
 Windows host; Linux cross-compilation alone does not validate those operations.

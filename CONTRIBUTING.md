@@ -14,6 +14,7 @@ task vet
 task check:fmt
 task build:linux
 task build:windows
+task build:gui
 sh -n install.sh
 ```
 
