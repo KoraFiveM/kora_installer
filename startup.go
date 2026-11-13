@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,6 +63,9 @@ func startup(ctx context.Context, root string, emit func(Progress)) error {
 	c, err := serverConfig(root)
 	if err != nil {
 		return err
+	}
+	if !c.Docker {
+		return startNative(ctx, root, emit)
 	}
 	values, err := readEnvironment(root)
 	if err != nil {
@@ -208,7 +212,7 @@ func startupContainerState(data []byte) (bool, error) {
 }
 
 func startupSummary(root string, c Config, errText string, logs []string) string {
-	heading := "KORA // SERVER READY"
+	heading := "KORA // SERVER RESPONDING LOCALLY"
 	if errText != "" {
 		heading = "KORA // STARTUP NEEDS ATTENTION"
 	}
@@ -219,6 +223,17 @@ func startupSummary(root string, c Config, errText string, logs []string) string
 	}
 	if errText != "" {
 		out += "Error: " + errText + "\n\nRecent logs:\n" + strings.Join(logs, "\n") + "\n\nConfigured links (readiness not confirmed):\n"
+	}
+	if !c.Docker {
+		if n, e := nativeMeta(root); e == nil {
+			if n.Service != "" {
+				out += "FXServer Windows service: " + n.Service + "\n"
+			}
+			if n.DatabaseService != "" {
+				out += "MariaDB Windows service: " + n.DatabaseService + "\n"
+			}
+			out += "Resources: " + filepath.Join(root, "server-data", "resources") + "\n"
+		}
 	}
 	out += clickableLinks(c) + "\n\nLinks use this host. For remote FiveM/txAdmin access, use the server IP.\nAdminer remains local to the host (or use a tunnel).\n"
 	out += "Docker services and data are retained when this installer closes.\nManage this server: kora --server " + fmt.Sprintf("%q", root) + "\n"

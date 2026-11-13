@@ -18,7 +18,7 @@ type versionChoicesMsg struct {
 func versionField(key string) bool {
 	return key == "game-build" || key == "artifact" || key == "kora-tag"
 }
-func versionChoices(key string, catalogSource string) tea.Cmd {
+func versionChoices(key string, catalogSource string, platform string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
@@ -34,7 +34,7 @@ func versionChoices(key string, catalogSource string) tea.Cmd {
 			}
 		case "artifact":
 			v.Values = []string{"recommended"}
-			address, err := s.artifact(ctx, "recommended", "linux")
+			address, err := s.artifact(ctx, "recommended", platform)
 			v.Err = err
 			if err == nil {
 				v.Values = append(v.Values, address)
@@ -92,7 +92,7 @@ func (m model) updateVersions(msg tea.Msg) (model, tea.Cmd, bool) {
 	case "r":
 		m.versionLoading = true
 		m.err = ""
-		return m, versionChoices(fields[m.step].Key, m.config.CatalogSource), true
+		return m, versionChoices(fields[m.step].Key, m.config.CatalogSource, targetPlatform(m.config)), true
 	case "c":
 		m.stage = "form"
 		m.err = ""

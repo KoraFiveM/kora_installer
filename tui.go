@@ -43,6 +43,8 @@ type field struct {
 }
 
 var fields = []field{
+	{"windows-service", "01 / HOST", "Run FXServer as a Windows service?", "Optional automatic service. Run this installer as Administrator to register services. Otherwise launch from start.cmd.", []string{"no", "yes"}, false},
+	{"db-setup", "02 / DATABASE", "Database service", "new-service installs isolated MariaDB here; existing uses your running MariaDB/MySQL service and creates only a new database/account.", []string{"new-service", "existing"}, false},
 	{"resources", "01 / SOURCE", "Resource catalog", "Default: docs.koraframe.work/resources.json with GitHub fallback. Paste a local file or HTTP(S)/GitHub URL.", nil, false},
 	{"txadmin", "01 / HOST", "Bring txAdmin along?", "Optional web administration, monitoring and console.", []string{"no", "yes"}, false},
 	{"tx-port", "01 / HOST", "txAdmin port", "Choose a free TCP port. Default: 40120.", nil, false},
@@ -145,6 +147,12 @@ func (m model) Init() tea.Cmd {
 func (m model) hidden(f field) bool {
 	c := m.config
 	switch f.Key {
+	case "windows-service", "db-setup":
+		return c.Docker
+	case "db-expose-port", "adminer":
+		return !c.Docker
+	case "db-type":
+		return !c.Docker && c.DBSetup == "new-service"
 	case "resources":
 		return c.CatalogSource == ""
 	case "tx-port":
@@ -155,8 +163,10 @@ func (m model) hidden(f field) bool {
 		return !c.Adminer
 	case "db-name", "db-user", "db-password":
 		return c.DBAuto
-	case "db-host", "db-port", "db-admin", "db-admin-password":
-		return true
+	case "db-port":
+		return c.Docker
+	case "db-host", "db-admin", "db-admin-password":
+		return c.Docker || c.DBSetup == "new-service"
 	case "report-path":
 		return !c.Report
 	case "secrets-path":
@@ -179,6 +189,10 @@ func (m model) value(k string) string {
 		return "no"
 	}
 	switch k {
+	case "windows-service":
+		return b(c.WindowsService)
+	case "db-setup":
+		return c.DBSetup
 	case "resources":
 		return c.CatalogSource
 	case "txadmin":
@@ -251,7 +265,7 @@ func (m *model) set(k, v string) error {
 		if e != nil || n < 1 || n > 65535 {
 			return fmt.Errorf("Enter a port between 1 and 65535")
 		}
-		if k != "db-port" {
+		if k != "db-port" || (!c.Docker && c.DBSetup == "new-service") {
 			if err := checkEnteredPort(m.config, k, n); err != nil {
 				return err
 			}
@@ -264,6 +278,14 @@ func (m *model) set(k, v string) error {
 	switch k {
 	case "resources":
 		c.CatalogSource = v
+	case "windows-service":
+		c.WindowsService = v == "yes"
+	case "db-setup":
+		c.DBSetup = v
+		if v == "new-service" {
+			c.DBType = "maria"
+			c.DBHost = "127.0.0.1"
+		}
 	case "txadmin":
 		c.TXAdmin = v == "yes"
 	case "tx-port":
@@ -360,7 +382,7 @@ func (m *model) loadField() tea.Cmd {
 		m.stage = "version-select"
 		m.versionOptions = nil
 		m.versionLoading = true
-		return versionChoices(f.Key, m.config.CatalogSource)
+		return versionChoices(f.Key, m.config.CatalogSource, targetPlatform(m.config))
 	}
 	return m.input.Focus()
 }
@@ -678,6 +700,9 @@ func (m model) summary(c Config) string {
 		tx = fmt.Sprintf("Enabled · port %d", c.TXPort)
 	}
 	rows := [][2]string{{"HOST", c.Hostname}, {"RUNTIME", mode}, {"TXADMIN", tx}, {"FIVEM", fmt.Sprintf("TCP + UDP / %d", c.CFXPort)}, {"DATABASE", c.DBType + " / " + c.DBName}, {"ADMINER", yesPath(c.Adminer, fmt.Sprintf("http://127.0.0.1:%d", c.AdminerPort))}, {"DB HOST PORT", yesPath(c.DBExposePort, strconv.Itoa(c.DBHostPort))}, {"DB USER", c.DBUser + " · new account"}, {"CFX ACCOUNT", c.CFXUser}, {"SECRETS", "License + passwords hidden"}, {"GAME BUILD", c.GameBuild}, {"KORA VERSION", c.KoraTag}, {"DESTINATION", c.Output + " / " + installationName(c)}, {"REPORT", yesPath(c.Report, c.ReportPath)}, {"SECRETS EXPORT", yesPath(c.Secrets, c.SecretsPath)}}
+	if !c.Docker {
+		rows = append(rows, [2]string{"WINDOWS SERVICE", yesPath(c.WindowsService, "Automatic FXServer service")}, [2]string{"DB SETUP", c.DBSetup})
+	}
 	if c.CatalogSource != "" {
 		rows = append(rows, [2]string{"CATALOG", c.CatalogSource})
 	}
@@ -752,12 +777,16 @@ func (m model) View() tea.View {
 	case "ready":
 		content = title.Render("LOCKED VERSIONS // READY TO INSTALL") + "\n" + accent.Render("LIVE LOCK  GAME BUILD "+m.plan.Config.GameBuild+"  /  ARTIFACT "+m.plan.ArtifactURL) + "\n\n" + m.summary(m.plan.Config) + "\n\n" + accent.Render(fmt.Sprintf("%d repositories pinned to exact commits", len(m.plan.Resources))) + "\n" + dim.Render("Artifact: "+m.plan.ArtifactURL) + "\n\n"
 		if m.plan.TXRecipe != nil {
-			content += dim.Render("Recipe mode: Git clones; config adapted to private credentials.\nCreate/select-only SQL maps to a fresh Docker database.\nNo owner principals are added automatically. Source repos retained.") + "\n\n"
+			content += dim.Render("Recipe mode: Git clones; config adapted to private credentials.\nCreate/select-only SQL maps to a fresh database.\nNo owner principals are added automatically. Source repos retained.") + "\n\n"
 		}
 		if !m.plan.Git {
 			content += lipgloss.NewStyle().Foreground(warning).Render("ARCHIVE MODE · Git tracking will not be available.") + "\n"
 		}
-		content += dim.Render("Enter downloads artifacts and clones resources. Docker creates\nthe database when you choose to start the server after installation.\nThe selected host ports must be free before startup.") + "\n\n"
+		installHint := "Enter downloads artifacts and clones resources. Docker creates\nthe database when you choose to start the server after installation."
+		if !m.plan.Config.Docker {
+			installHint = "Enter installs Windows FXServer, clones resources, creates a new\ndatabase/account and registers this server. Existing data is retained."
+		}
+		content += dim.Render(installHint+"\nThe selected host ports must be free before startup.") + "\n\n"
 		for _, r := range m.plan.Resources {
 			content += dim.Render(r.Path) + "  " + accent.Render(r.Ref) + dim.Render("  "+r.Commit[:12]) + "\n"
 			if r.SelectionNote != "" {
@@ -770,11 +799,11 @@ func (m model) View() tea.View {
 		if m.stage == "startup-done" {
 			heading = "STARTUP NEEDS ATTENTION"
 			if m.startupReady {
-				heading = "READY TO CONNECT"
+				heading = "RESPONDING LOCALLY"
 			}
 		}
 		n := (width - 6) * m.progress.Done / 3
-		content = title.Render(heading) + "\n" + accent.Render(strings.Repeat("━", n)) + dim.Render(strings.Repeat("─", max(0, width-6-n))) + "\n" + dim.Render("Build + start → FiveM response (3 milestones)") + "\n\n"
+		content = title.Render(heading) + "\n" + accent.Render(strings.Repeat("━", n)) + dim.Render(strings.Repeat("─", max(0, width-6-n))) + "\n" + dim.Render("Prepare → start → FiveM response") + "\n\n"
 		if c, err := serverConfig(m.result.Folder); err == nil {
 			content += clickableLinks(c) + "\n" + dim.Render("Links use this host. From another PC, replace 127.0.0.1 with the server IP.") + "\n\n"
 		}
@@ -814,11 +843,11 @@ func (m model) View() tea.View {
 	case "start-choice":
 		content = accent.Render("INSTALL COMPLETE // "+m.result.Folder) + "\n\n" +
 			title.Render("Start the server now?") + "\n\n" +
-			dim.Render("Docker will build the image and show live FXServer logs.\nExisting data in this installation is retained. Selected ports must be free.") + "\n\n"
+			dim.Render("Start the installed server and show live FXServer logs.\nExisting data in this installation is retained. Selected ports must be free.") + "\n\n"
 		if m.config.Adminer {
 			content += dim.Width(width-6).Render("Adminer after startup: "+adminerURL(m.config)+"\nPassword: use DB_PASSWORD from this installation’s .env.") + "\n\n"
 		}
-		choices := []string{"○ No, finish", "○ Yes, start Docker"}
+		choices := []string{"○ No, finish", "○ Yes, start server"}
 		choices[m.startChoice] = strings.Replace(choices[m.startChoice], "○", "●", 1)
 		cards := []string{}
 		for i, choice := range choices {

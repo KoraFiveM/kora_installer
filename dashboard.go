@@ -107,7 +107,7 @@ func (m model) updateDashboard(msg tea.Msg) (model, tea.Cmd, bool) {
 		if v.Err != nil {
 			m.err = v.Err.Error()
 		} else {
-			m.notice = v.Action + " completed; refreshing Docker status"
+			m.notice = v.Action + " completed; refreshing server status"
 		}
 		m.scanPending = true
 		return m, m.scanServers(), true
@@ -149,6 +149,22 @@ func (m model) updateDashboard(msg tea.Msg) (model, tea.Cmd, bool) {
 		}
 		if key.String() == "enter" {
 			root, action := m.actionRoot, m.serverAction
+			if regularFile(filepath.Join(root, "native.json")) {
+				if action == "logs" {
+					m.stage = "server-logs"
+					m.serverLogs = nativeLogs(root)
+					return m, nil, true
+				}
+				if action == "start" {
+					return m, m.startLaunch(root), true
+				}
+				m.stage = "server-working"
+				return m, func() tea.Msg {
+					ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+					defer cancel()
+					return serverActionMsg{Err: nativeAction(ctx, root, action), Action: action}
+				}, true
+			}
 			if action == "logs" {
 				m.stage = "server-working"
 				return m, func() tea.Msg {
