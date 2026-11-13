@@ -78,13 +78,13 @@ func checkPorts(c Config) error {
 		ports = append(ports, c.AdminerPort)
 	}
 	for _, port := range ports {
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", port))
 		if err != nil {
 			return fmt.Errorf("TCP port %d is in use or unavailable. Choose a free port before installing or stop the conflicting server yourself", port)
 		}
 		listener.Close()
 	}
-	packet, err := net.ListenPacket("udp", fmt.Sprintf(":%d", c.CFXPort))
+	packet, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", c.CFXPort))
 	if err != nil {
 		return fmt.Errorf("UDP port %d is in use or unavailable. Choose a free FiveM port", c.CFXPort)
 	}
@@ -141,13 +141,13 @@ func checkEnteredPort(c Config, key string, port int) error {
 	if key == "adminer-port" {
 		address = fmt.Sprintf("127.0.0.1:%d", port)
 	}
-	listener, err := net.Listen("tcp", address)
+	listener, err := net.Listen("tcp4", address)
 	if err != nil {
 		return fmt.Errorf("TCP port %d is in use or unavailable; choose another port", port)
 	}
 	defer listener.Close()
 	if key == "cfx-port" {
-		packet, err := net.ListenPacket("udp", address)
+		packet, err := net.ListenPacket("udp4", address)
 		if err != nil {
 			return fmt.Errorf("UDP port %d is in use or unavailable; choose another FiveM port", port)
 		}

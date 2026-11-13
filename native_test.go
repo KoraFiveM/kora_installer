@@ -88,7 +88,9 @@ func TestNativeMetadataAndDiscovery(t *testing.T) {
 	if len(servers) != 1 || !servers[0].Managed {
 		t.Fatal(servers)
 	}
-	if resourceDirectory(servers[0]) != filepath.Join(root, "server-data", "resources") {
+	got, gotErr := os.Stat(resourceDirectory(servers[0]))
+	want, wantErr := os.Stat(filepath.Join(root, "server-data", "resources"))
+	if gotErr != nil || wantErr != nil || !os.SameFile(got, want) {
 		t.Fatal("wrong native resource directory")
 	}
 }
