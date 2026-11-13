@@ -1,39 +1,69 @@
 # Kora — install and manage your development servers
 
-`kora` is a Linux x86-64 terminal app (including WSL 2) with Kora lime colours, animated status,
+`kora` installs native Windows x86-64 servers or Docker-based Linux servers, with Kora lime colours, animated status,
 version selectors, masked paste-capable inputs, and a server dashboard. Discover
 existing Kora installations, manage their Docker services, stage resource updates,
 or create another server with separate files, ports, database and Compose project.
 
 ## Prerequisites
 
-Use an **x86-64 Linux host or WSL 2 distribution** with Docker running Linux containers,
-Docker Compose v2 (`docker compose`), and Git available in the same terminal as
-`kora`. The installer currently requires Docker; ARM hosts are not supported.
-Git is required for txAdmin recipes and keeps installed resources as editable
-repositories. Have your Cfx.re username and a license key from the
-[Cfx.re Portal](https://portal.cfx.re/) ready, plus GitHub access to any private
-resource repositories you select.
+Use an **x86-64 Windows or Linux host**. Windows installations run FXServer and
+MariaDB/MySQL directly as native processes/services: Docker, WSL and Python are
+not required. Linux installations continue to use Docker and Compose v2.
+Both paths require Git and a Cfx.re username and [license key](https://portal.cfx.re/).
 
-### Windows / WSL
+### Native Windows
 
-1. Install or update [WSL 2 using Microsoft's guide](https://learn.microsoft.com/en-us/windows/wsl/install).
-   For a new installation, run `wsl --install` from an administrator PowerShell
-   window, restart, and finish setting up your Linux user.
-2. Install and start [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
-   Use its WSL 2 backend and Linux containers. Docker Desktop includes Compose.
-3. Enable your distribution under Docker Desktop's **Settings → Resources →
-   WSL Integration**, following the [Docker WSL guide](https://docs.docker.com/desktop/features/wsl/).
-   Open that distribution's Linux terminal, install Git and download tools there,
-   and run the one-line installer below. Kora runs entirely inside WSL; there is
-   no native Windows executable to install.
+1. Install [Git for Windows](https://git-scm.com/install/windows) and the
+   [Microsoft Visual C++ x64 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
+2. Download `kora_installer.exe` and its `.sha256` file from the
+   [releases page](https://github.com/KoraFiveM/kora_installer/releases).
+   The native Windows asset is introduced by this change; older Linux-only
+   releases do not contain it. Compare `Get-FileHash .\kora_installer.exe -Algorithm SHA256`
+   with the published checksum.
+3. Open PowerShell **as Administrator** when installing a new database service
+   or enabling the optional FXServer service. Run `.\kora_installer.exe`.
+4. Choose a parent folder and a new directory name. Existing folders are never
+   reused. The wizard installs Windows FXServer artifacts and Git resource clones.
+5. Choose **new-service** for a separate local MariaDB service (default), or
+   **existing** to connect to your running MariaDB/MySQL service. Both choices
+   create a fresh database and account without changing existing ones.
+6. Choose whether FXServer should be an automatic Windows service. Without it,
+   use the installed `start.cmd` or the Kora dashboard. Finish by choosing whether
+   to start the server now.
 
-For Ubuntu/Debian inside WSL, the download tools and Git can be installed with:
+A new MariaDB installation is kept under the chosen server directory, verified
+against MariaDB's official SHA-256 manifest, and bound to `127.0.0.1`. It receives
+a unique service name and data directory. Select an unused database port when
+installing multiple servers. `--mariadb-version` defaults to `11.4.13`.
+An existing service requires an administrative connection with permission to
+create databases/users and grant access; those administrator credentials are
+used for provisioning and not retained. Newly generated MariaDB administrator
+credentials are stored in private `database-admin.json` for recovery.
 
-```sh
-sudo apt update
-sudo apt install git curl ca-certificates coreutils
+```powershell
+# Guided native installation; choose the directory and service options in the TUI.
+.\kora_installer.exe
+
+# Native installation with a dedicated MariaDB and an automatic FXServer service.
+.\kora_installer.exe --yes --start --output 'C:\KoraServers' --name city --windows-service --db-port 3307 --cfx-user YOUR_USER --license-key YOUR_CFX_LICENSE_KEY
+
+# Use an existing MySQL service; enter the administrator password in the masked TUI.
+.\kora_installer.exe --output 'D:\Servers' --name city --db-setup existing --db-type mysql --db-host 127.0.0.1 --db-port 3306 --db-admin root
 ```
+
+Each installation contains its own `kora.exe`, `start.cmd`, `native.json`, private
+`.env`, `artifacts/`, and editable Git repositories under `server-data/resources/`.
+It is registered in Kora's server dashboard. The optional FXServer service runs as
+LocalService; the MariaDB service is independent. Stopping FXServer does not stop
+or delete the database. Service creation requires elevation and never replaces
+an existing service. Failed installs retain files and any newly created services
+for inspection. Resource updates are staged separately, as on Linux.
+
+Allow your selected FiveM port through Windows and upstream firewalls for **TCP
+and UDP**. Allow the txAdmin TCP port only if needed. Kora does not change firewall
+rules. A local `/info.json` response confirms local readiness, not public access.
+Adminer and Docker database-port publishing options apply only to Linux/Docker.
 
 ### Linux
 
@@ -48,12 +78,11 @@ sudo apt install git curl ca-certificates coreutils
    so your normal user can access it. Docker-group membership grants root-level
    privileges; use the access method appropriate for your host.
 3. Install [Git for Linux](https://git-scm.com/install/linux), a POSIX shell,
-   `curl` or `wget`, CA certificates, and `sha256sum` or `shasum`. The Ubuntu/Debian
-   command above installs Git and the tools used by the curl examples below.
+   `curl` or `wget`, CA certificates, and `sha256sum` or `shasum`. For Ubuntu/Debian: `sudo apt install git curl ca-certificates coreutils`.
 
 ### Verify before running Kora
 
-Run these in the **same WSL or Linux terminal** you will use for Kora:
+For the Linux/Docker path, run these in the **same Linux terminal** you will use for Kora:
 
 ```sh
 git --version
@@ -93,10 +122,10 @@ when a terminal is available. Add `~/.local/bin` to PATH if instructed, then run
 kora
 ```
 
-The workflow publishes a Linux x86-64 binary, its SHA-256 checksum, and a ZIP
-for each `kora-v*` release. On Windows, run the shell command inside WSL 2; Windows
-binaries are not built. Docker Desktop must expose its Linux engine to that WSL
-distribution. A release must be published before the download command works.
+GitHub Actions builds both Linux and native Windows binaries **inside Docker**,
+then publishes binaries, ZIPs and SHA-256 checksums for each `kora-v*` release.
+This build container is not a Windows runtime dependency. The shell bootstrap
+installs the Linux binary; Windows users download `kora_installer.exe` instead.
 
 Other bootstrap examples:
 
@@ -289,7 +318,7 @@ fields. Repository URLs must be credential-free GitHub HTTPS URLs.
 
 ## Prerequisites and versions
 
-Docker is required. The in-app checks verify Linux x86-64, Git, Docker CLI,
+On Linux, Docker is required. The in-app checks verify Linux x86-64, Git, Docker CLI,
 Compose, local context and a running Linux x86-64 engine. They provide official
 help links and retry controls. Git is required for recipe mode. Authenticate Git
 for private Kora repositories before installing. No host Python or database is
@@ -300,8 +329,7 @@ needed when using `kora`; Python runs inside the generated container.
 - Linux: [Docker Engine setup](https://docs.docker.com/engine/install/).
 
 Remote Docker contexts are unsupported because this installer relies on local bind
-mounts. Kora must run inside Linux or WSL, with a working Linux
-Docker backend. The installer does not install system prerequisites or reboot.
+mounts. The Linux/Docker path needs a working local Linux Docker backend. The installer does not install system prerequisites or reboot.
 
 Game builds come from FiveM's documented Legacy build list; recommended Linux
 FXServer artifacts come from JG Scripts. These fields have selection lists with
@@ -379,7 +407,21 @@ sh -n install.sh
 
 Tests use local Git fixtures, simulated HTTP responses, temporary port bindings,
 and generated Compose configuration. The walkthrough renderer is opt-in and makes
-no network/installation calls. CI tests/builds Linux x86-64; live WSL,
+no network/installation calls. CI tests Linux and Windows and builds both binaries in Docker; live Windows service,
 FXServer/resource compatibility and Docker Desktop still need target-host acceptance.
 
 Copyright © 2026 Kora Framework.
+
+## Build release artifacts in Docker
+
+```sh
+task build:docker
+# Or without Task:
+docker buildx build -f Dockerfile.build --target artifacts --output type=local,dest=dist .
+```
+
+Outputs are under `dist/linux-amd64/` and `dist/windows-amd64/`, including
+`kora_installer.exe`, ZIP archives, and checksums. This does not start servers or
+publish a release. `task build:windows` cross-builds just the Windows executable.
+Windows SCM and MariaDB service registration still require live acceptance on a
+Windows host; Linux cross-compilation alone does not validate those operations.

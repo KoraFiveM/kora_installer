@@ -13,6 +13,7 @@ task test
 task vet
 task check:fmt
 task build:linux
+task build:windows
 sh -n install.sh
 ```
 
