@@ -54,6 +54,10 @@ func TestControlWindow(t *testing.T) {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		g.window.Synchronize(func() {
+			b := g.edit("license").Bounds()
+			if b.Width < 100 || b.Height < 10 {
+				t.Errorf("license input has invalid layout: %+v", b)
+			}
 			if target := os.Getenv("KORA_GUI_SCREENSHOT"); target != "" {
 				bitmap, err := walk.NewBitmapFromWindow(g.window)
 				if err != nil {
@@ -64,6 +68,10 @@ func TestControlWindow(t *testing.T) {
 					if err != nil {
 						t.Error(err)
 					} else {
+						// GDI screenshots are opaque; GetDIBits leaves alpha undefined.
+						for i := 3; i < len(img.Pix); i += 4 {
+							img.Pix[i] = 255
+						}
 						if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
 							t.Error(err)
 						}
