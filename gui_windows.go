@@ -307,7 +307,14 @@ func (g *setupGUI) readConfig() (Config, error) {
 		*dest = strings.TrimSpace(g.edit(key).Text())
 	}
 	c.DBAdminPassword = g.edit("db-admin-password").Text()
+	c.TXAdmin = g.tx.Checked()
 	for key, dest := range map[string]*int{"cfx-port": &c.CFXPort, "tx-port": &c.TXPort, "db-port": &c.DBPort} {
+		if key == "db-port" && g.page < 2 {
+			continue
+		}
+		if key == "tx-port" && !c.TXAdmin {
+			continue
+		}
 		v, err := strconv.Atoi(strings.TrimSpace(g.edit(key).Text()))
 		if err != nil || v < 1 || v > 65535 {
 			return c, fmt.Errorf("%s must be a whole number from 1 to 65535", key)
@@ -384,6 +391,10 @@ func (g *setupGUI) advance() {
 	}
 	if err != nil {
 		g.notice("Let's fix this first", err.Error())
+		return
+	}
+	if g.page == 2 && (c.WindowsService || c.DBSetup == "new-service") && nativePrivilegeCheck() != nil {
+		g.notice("Service creation needs Administrator permission", "Use an existing database and turn off automatic FiveM startup, or go Back to Check your computer and restart as Administrator.")
 		return
 	}
 	g.config = c
