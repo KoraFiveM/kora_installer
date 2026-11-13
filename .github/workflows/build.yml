@@ -1,0 +1,78 @@
+name: Kora installer
+on:
+  push:
+    branches: ['**']
+    tags: ['kora-v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            binary: kora
+          - os: windows-latest
+            target: windows-amd64
+            binary: kora.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check formatting
+        run: test -z "$(gofmt -l *.go)"
+      - name: Offline Go tests
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Offline launcher tests
+        run: python -m unittest discover -s assets -p 'test_*.py' -v
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+        run: go build -trimpath -ldflags='-s -w' -o dist/${{ matrix.binary }} .
+      - name: Package with checksum
+        env:
+          INSTALLER_BINARY: ${{ matrix.binary }}
+          INSTALLER_TARGET: ${{ matrix.target }}
+        run: python package_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kora_installer-${{ matrix.target }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/kora-linux-amd64*
+            dist/kora-windows-amd64.exe*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/kora-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish verified CLI binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes "Kora CLI for Linux/WSL and Windows. Checksums are included." artifacts/*/kora-linux-amd64 artifacts/*/kora-linux-amd64.sha256 artifacts/*/kora-windows-amd64.exe artifacts/*/kora-windows-amd64.exe.sha256
