@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/lxn/walk"
@@ -86,6 +88,12 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 	if c.DBSetup == "existing" {
 		databaseMode = 1
 	}
+	sourceMode, sourcePath := 0, ""
+	if c.CatalogSource != "" && c.CatalogSource != defaultCatalogURL {
+		sourceMode, sourcePath = 1, c.CatalogSource
+	} else if c.RecipeInput != "" && c.RecipeInput != "bundled" {
+		sourceMode, sourcePath = 2, c.RecipeInput
+	}
 	dbType := 0
 	if c.DBType == "mysql" {
 		dbType = 1
@@ -110,6 +118,13 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 							d.Composite{Layout: d.HBox{}, Children: []d.Widget{link("Get Git for Windows", "https://git-scm.com/install/windows"), link("Get Microsoft VC++ runtime", "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist"), d.PushButton{Text: "Check again", OnClicked: g.checkComputer}}},
 							guiLabel("Creating Windows services needs Administrator permission. Restart before entering your license."),
 							d.PushButton{Text: "Restart as Administrator…", OnClicked: g.elevate},
+							d.PushButton{Text: "I already have a database — continue without creating services", OnClicked: func() {
+								g.combo("db-setup").SetCurrentIndex(1)
+								g.service.SetChecked(false)
+								g.config.DBSetup = "existing"
+								g.config.WindowsService = false
+								g.advance()
+							}},
 							guiLabel("Install missing tools using these links, then reopen Kora so it sees the updated PATH.")),
 						page(1,
 							g.input("hostname", "Server name (players see this)", c.Hostname, false),
@@ -139,8 +154,8 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 							guiLabel("Without automatic startup, use Your servers to start and stop it. Database data stays intact.")),
 						page(3,
 							guiLabel("You can leave everything here unchanged. Latest Kora releases and recommended FiveM artifacts are the defaults."),
-							g.choice("source", "Resources", []string{"Kora recommended catalog", "Custom resources.json file or URL", "Custom txAdmin recipe file or URL"}, 0),
-							g.input("source-path", "Custom source (optional)", "", false),
+							g.choice("source", "Resources", []string{"Kora recommended catalog", "Custom resources.json file or URL", "Custom txAdmin recipe file or URL"}, sourceMode),
+							g.input("source-path", "Custom source (optional)", sourcePath, false),
 							d.PushButton{Text: "Browse for a custom catalog or recipe…", OnClicked: func() { g.browse("source-path", false) }},
 							g.choice("game-build", "Game build", []string{c.GameBuild}, 0), g.choice("artifact", "FXServer artifact", []string{c.Artifact}, 0), g.choice("kora-tag", "Kora version", []string{c.KoraTag}, 0),
 							d.PushButton{Text: "Refresh available versions", OnClicked: g.refreshVersions},
@@ -354,6 +369,10 @@ func (g *setupGUI) advance() {
 		return
 	}
 	if g.page == 0 {
+		if g.combo("db-setup").CurrentIndex() == 0 && nativePrivilegeCheck() != nil {
+			g.notice("Administrator needed for a new database", "Click Restart as Administrator before continuing, or choose the existing database option.")
+			return
+		}
 		if g.checked {
 			g.show(1)
 		}
@@ -683,4 +702,13 @@ func (g *setupGUI) suggestPorts() {
 		g.edit(item.key).SetText(strconv.Itoa(*item.value))
 	}
 	g.status.SetText("Available ports selected. Kora checks them again before installation.")
+}
+
+// Keep backend helper processes out of the user's way; their output belongs in Control.
+func backgroundCommand(cmd *exec.Cmd) *exec.Cmd {
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.HideWindow = true
+	return cmd
 }

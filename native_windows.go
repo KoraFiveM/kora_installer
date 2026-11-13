@@ -59,7 +59,7 @@ func createMariaService(ctx context.Context, root string, c Config, name string)
 	if e := writeNew(root, "database-config.ini", []byte(template), 0600); e != nil {
 		return e
 	}
-	cmd := exec.CommandContext(ctx, executable, "--datadir="+data, "--service="+name, "--password="+c.DBAdminPassword, fmt.Sprintf("--port=%d", c.DBPort), "--config="+filepath.Join(root, "database-config.ini"))
+	cmd := backgroundCommand(exec.CommandContext(ctx, executable, "--datadir="+data, "--service="+name, "--password="+c.DBAdminPassword, fmt.Sprintf("--port=%d", c.DBPort), "--config="+filepath.Join(root, "database-config.ini")))
 	cmd.Dir = filepath.Join(root, "database")
 	if e := cmd.Run(); e != nil {
 		return errors.New("MariaDB service initialization failed; retained database files and service metadata are in the installation directory")
@@ -77,7 +77,7 @@ func registerFXService(root string, n nativeInstallation) error {
 		return e
 	}
 	// LocalService can read private files and write runtime state without full system privileges.
-	if e := exec.Command("icacls", root, "/grant", "*S-1-5-19:(OI)(CI)M").Run(); e != nil {
+	if e := backgroundCommand(exec.Command("icacls", root, "/grant", "*S-1-5-19:(OI)(CI)M")).Run(); e != nil {
 		return errors.New("cannot grant LocalService access to the installation")
 	}
 	manager, e := mgr.Connect()
@@ -211,7 +211,7 @@ func nativeAction(ctx context.Context, root, action string) error {
 	if e = checkPortsMustRead(root); e != nil {
 		return e
 	}
-	cmd := exec.Command(filepath.Join(root, "kora.exe"), "--native-run", root)
+	cmd := backgroundCommand(exec.Command(filepath.Join(root, "kora.exe"), "--native-run", root))
 	cmd.Dir = root
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS, HideWindow: true}
 	if e = cmd.Start(); e != nil {

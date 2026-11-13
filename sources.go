@@ -39,7 +39,7 @@ func githubToken() string {
 		if cachedToken == "" {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			if data, err := exec.CommandContext(ctx, "gh", "auth", "token").Output(); err == nil {
+			if data, err := backgroundCommand(exec.CommandContext(ctx, "gh", "auth", "token")).Output(); err == nil {
 				cachedToken = strings.TrimSpace(string(data))
 			}
 		}

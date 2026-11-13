@@ -12,7 +12,7 @@ import (
 func remoteGit(ctx context.Context, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"ls-remote"}, args...)...)
+	cmd := backgroundCommand(exec.CommandContext(ctx, "git", append([]string{"ls-remote"}, args...)...))
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
 	out, err := cmd.Output()
 	if err != nil {

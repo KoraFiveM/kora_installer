@@ -26,7 +26,7 @@ type commandRunner func(context.Context, string, ...string) (string, error)
 func runProbe(ctx context.Context, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, name, args...).Output()
+	out, err := backgroundCommand(exec.CommandContext(ctx, name, args...)).Output()
 	return strings.TrimSpace(string(out)), err
 }
 

@@ -407,13 +407,13 @@ func install(ctx context.Context, p Plan, progress func(Progress)) (result Resul
 		}
 		if p.Git {
 			progress(Progress{"GIT CLONE  " + r.Path + " @ " + r.Ref, i + 2, total})
-			cmd := exec.CommandContext(ctx, "git", "clone", "--no-checkout", "--", r.Repository, dest)
+			cmd := backgroundCommand(exec.CommandContext(ctx, "git", "clone", "--no-checkout", "--", r.Repository, dest))
 			cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
 			if e = cmd.Run(); e != nil {
 				return fail(fmt.Errorf("clone failed for %s; check Git credentials (partial checkout retained)", r.Path))
 			}
 			progress(Progress{"GIT CHECKOUT  " + r.Path + "  " + r.Commit[:12], i + 2, total})
-			cmd = exec.CommandContext(ctx, "git", "-C", dest, "checkout", "--detach", r.Commit)
+			cmd = backgroundCommand(exec.CommandContext(ctx, "git", "-C", dest, "checkout", "--detach", r.Commit))
 			if e = cmd.Run(); e != nil {
 				if _, fetchErr := gitOutput(ctx, dest, "fetch", "--no-recurse-submodules", "origin", r.Commit); fetchErr != nil {
 					return fail(fmt.Errorf("pinned commit unavailable for %s", r.Path))
