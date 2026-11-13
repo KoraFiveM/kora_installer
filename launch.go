@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -64,6 +63,7 @@ func dockerCommand(ctx context.Context, root string, args ...string) (*exec.Cmd,
 }
 
 func checkPorts(c Config) error {
+	lc := portListenConfig()
 	ports := []int{c.CFXPort}
 	if !c.Docker && c.DBSetup == "new-service" {
 		ports = append(ports, c.DBPort)
@@ -78,13 +78,13 @@ func checkPorts(c Config) error {
 		ports = append(ports, c.AdminerPort)
 	}
 	for _, port := range ports {
-		listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", port))
+		listener, err := lc.Listen(context.Background(), "tcp4", fmt.Sprintf(":%d", port))
 		if err != nil {
 			return fmt.Errorf("TCP port %d is in use or unavailable. Choose a free port before installing or stop the conflicting server yourself", port)
 		}
 		listener.Close()
 	}
-	packet, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", c.CFXPort))
+	packet, err := lc.ListenPacket(context.Background(), "udp4", fmt.Sprintf(":%d", c.CFXPort))
 	if err != nil {
 		return fmt.Errorf("UDP port %d is in use or unavailable. Choose a free FiveM port", c.CFXPort)
 	}
@@ -118,6 +118,7 @@ func adminerURL(c Config) string {
 
 // Check only the edited field so an unrelated busy default can be corrected later.
 func checkEnteredPort(c Config, key string, port int) error {
+	lc := portListenConfig()
 	if key == "tx-port" && port == 30120 {
 		return errors.New("txAdmin does not permit port 30120; choose another port")
 	}
@@ -141,13 +142,13 @@ func checkEnteredPort(c Config, key string, port int) error {
 	if key == "adminer-port" {
 		address = fmt.Sprintf("127.0.0.1:%d", port)
 	}
-	listener, err := net.Listen("tcp4", address)
+	listener, err := lc.Listen(context.Background(), "tcp4", address)
 	if err != nil {
 		return fmt.Errorf("TCP port %d is in use or unavailable; choose another port", port)
 	}
 	defer listener.Close()
 	if key == "cfx-port" {
-		packet, err := net.ListenPacket("udp4", address)
+		packet, err := lc.ListenPacket(context.Background(), "udp4", address)
 		if err != nil {
 			return fmt.Errorf("UDP port %d is in use or unavailable; choose another FiveM port", port)
 		}
