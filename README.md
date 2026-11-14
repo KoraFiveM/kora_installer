@@ -6,6 +6,10 @@ Both interfaces share the same installation, validation and server-management co
 
 ## Windows desktop app
 
+![Kora Control on Windows with dark inputs and buttons in the server setup wizard](docs/kora-control-windows.png)
+
+*Captured from the native Windows app using simulated setup values.*
+
 Build with `task build:gui`, then double-click `dist/kora-control.exe`. Tagged
 releases built with this workflow include `kora-control.exe` and its SHA-256
 checksum, alongside the existing CLI. Older releases may contain only the CLI.
