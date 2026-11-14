@@ -10,6 +10,30 @@ Both interfaces share the same installation, validation and server-management co
 
 *Captured from the native Windows app using simulated setup values.*
 
+<details>
+<summary>More screenshots: database setup, review, and server logs</summary>
+
+**Database and startup** — choose a new MariaDB service or an existing database.
+
+![Kora Control database setup and Windows service options](docs/kora-control-database.png)
+
+**Review before installing** — check the destination, ports and resource versions.
+
+![Kora Control installation review with simulated resource versions](docs/kora-control-review.png)
+
+**Your servers** — server controls alongside coloured logs and operation records.
+
+![Kora Control server management with coloured demonstration logs](docs/kora-control-servers.png)
+
+**Filter logs** — narrow the view without changing the saved log.
+
+![Kora Control logs filtered to Kora entries](docs/kora-control-filtered-logs.png)
+
+All screenshots show native Windows controls with simulated values; no real
+servers, database services or credentials were used for these captures.
+
+</details>
+
 Build with `task build:gui`, then double-click `dist/kora-control.exe`. Tagged
 releases built with this workflow include `kora-control.exe` and its SHA-256
 checksum, alongside the existing CLI. Older releases may contain only the CLI.
