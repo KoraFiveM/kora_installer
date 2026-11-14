@@ -174,6 +174,9 @@ func inspectServer(ctx context.Context, server Server, progress func(Progress)) 
 					remote = "https://github.com/" + remote
 				}
 				_, valid := repoSlug(remote)
+				if valid == nil {
+					r.Repository = remote
+				}
 				switch {
 				case err != nil || gitErr != nil || remoteErr != nil:
 					r.State = "Cannot read checkout"
@@ -205,6 +208,10 @@ func inspectServer(ctx context.Context, server Server, progress func(Progress)) 
 }
 
 func prepareUpdate(ctx context.Context, server Server, tag string, catalogSource string, progress func(Progress)) (UpdatePlan, error) {
+	return prepareUpdateScope(ctx, server, tag, catalogSource, progress, false)
+}
+
+func prepareUpdateScope(ctx context.Context, server Server, tag, catalogSource string, progress func(Progress), koraOnly bool) (UpdatePlan, error) {
 	p := UpdatePlan{Server: server}
 	if server.Managed && !regularFile(filepath.Join(server.Path, "install.complete")) {
 		return p, errors.New("incomplete installations cannot be updated; create a fresh installation")
@@ -237,6 +244,18 @@ func prepareUpdate(ctx context.Context, server Server, tag string, catalogSource
 		}
 	}
 	for i, r := range list {
+		if koraOnly {
+			if r.Repository == "" && r.State != "No Git history — archives cannot be updated safely" {
+				return p, fmt.Errorf("%s: cannot verify repository ownership; update cancelled", r.Path)
+			}
+			slug, _ := repoSlug(r.Repository)
+			if !strings.HasPrefix(strings.ToLower(slug), "korafivem/") {
+				continue
+			}
+			if r.State != "Clean" {
+				return p, fmt.Errorf("%s has local changes or cannot be inspected. Update cancelled", r.Path)
+			}
+		}
 		if r.State != "Clean" {
 			return p, fmt.Errorf("%s: %s. Existing files are preserved", r.Path, r.State)
 		}
