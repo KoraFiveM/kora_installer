@@ -40,8 +40,17 @@ func TestControlWindow(t *testing.T) {
 	if format.CrTextColor != win.COLORREF(walk.RGB(255, 112, 112)) {
 		t.Fatalf("log colour not applied: %x", format.CrTextColor)
 	}
-	if got := g.serverInfo.SendMessage(win.WM_GETTEXTLENGTH, 0, 0); got != 12 {
-		t.Fatalf("filter or newline conversion failed: %d", got)
+	if got := g.serverInfo.SendMessage(win.WM_GETTEXTLENGTH, 0, 0); got != 13 {
+		t.Fatalf("filter or CRLF text export failed: %d", got)
+	}
+	// RichEdit selection offsets count its internal CR, whereas WM_GETTEXTLENGTH
+	// includes CRLF for compatibility with the standard Windows edit control.
+	g.serverInfo.Render("\x1b[31mERROR first\x1b[0m\n\x1b[32mready", "")
+	selection = win.CHARRANGE{CpMin: 12, CpMax: 13}
+	g.serverInfo.SendMessage(win.EM_EXSETSEL, 0, uintptr(unsafe.Pointer(&selection)))
+	g.serverInfo.SendMessage(win.EM_GETCHARFORMAT, win.SCF_SELECTION, uintptr(unsafe.Pointer(&format)))
+	if format.CrTextColor != win.COLORREF(walk.RGB(149, 255, 0)) {
+		t.Fatalf("second-line colour offset incorrect: %x", format.CrTextColor)
 	}
 	g.edit("license").SetText("PASTED_DEMO_LICENSE")
 	if g.edit("license").Text() != "PASTED_DEMO_LICENSE" || !g.edit("license").PasswordMode() {
