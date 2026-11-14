@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/lxn/walk"
 	"github.com/lxn/win"
@@ -28,6 +29,19 @@ func TestControlWindow(t *testing.T) {
 	defer g.window.Dispose()
 	if !strings.Contains(g.window.Title(), "Kora Control") {
 		t.Fatal("wrong app identity")
+	}
+
+	g.serverInfo.Render("\x1b[31mERROR first\x1b[0m\n\x1b[32mready", "error")
+	var selection = win.CHARRANGE{CpMin: 0, CpMax: 1}
+	g.serverInfo.SendMessage(win.EM_EXSETSEL, 0, uintptr(unsafe.Pointer(&selection)))
+	var format win.CHARFORMAT
+	format.CbSize = uint32(unsafe.Sizeof(format))
+	g.serverInfo.SendMessage(win.EM_GETCHARFORMAT, win.SCF_SELECTION, uintptr(unsafe.Pointer(&format)))
+	if format.CrTextColor != win.COLORREF(walk.RGB(255, 112, 112)) {
+		t.Fatalf("log colour not applied: %x", format.CrTextColor)
+	}
+	if got := g.serverInfo.SendMessage(win.WM_GETTEXTLENGTH, 0, 0); got != 12 {
+		t.Fatalf("filter or newline conversion failed: %d", got)
 	}
 	g.edit("license").SetText("PASTED_DEMO_LICENSE")
 	if g.edit("license").Text() != "PASTED_DEMO_LICENSE" || !g.edit("license").PasswordMode() {
