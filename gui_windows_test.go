@@ -94,38 +94,54 @@ func TestControlWindow(t *testing.T) {
 				t.Errorf("license input has invalid layout: %+v", b)
 			}
 			if target := os.Getenv("KORA_GUI_SCREENSHOT"); target != "" {
-				// Capture the visible desktop pixels, not WM_PRINT (native tabs paint
-				// their backing control over their child pages in that printing path).
-				bitmap, err := controlScreenshot(g.window)
-				if err != nil {
-					t.Error(err)
-				} else {
-					defer bitmap.Dispose()
-					img, err := bitmap.ToImage()
-					if err != nil {
-						t.Error(err)
-					} else {
-						// GDI screenshots are opaque; GetDIBits leaves alpha undefined.
-						for i := 3; i < len(img.Pix); i += 4 {
-							img.Pix[i] = 255
-						}
-						if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-							t.Error(err)
-						}
-						f, err := os.Create(target)
-						if err != nil {
-							t.Error(err)
-						} else {
-							if err := png.Encode(f, img); err != nil {
-								t.Error(err)
-							}
-							f.Close()
-						}
-					}
-				}
+				saveControlScreenshot(t, g.window, target)
 			}
-			g.window.Close()
 		})
+		if target := os.Getenv("KORA_GUI_SCREENSHOT"); target != "" {
+			scenes := []struct {
+				name  string
+				setup func()
+			}{
+				{"database", func() { g.show(2); g.combo("db-setup").SetCurrentIndex(0); g.service.SetChecked(true) }},
+				{"review", func() {
+					g.show(4)
+					preview := c
+					preview.Output = `C:\KoraServers`
+					preview.DirectoryName = "kora-demo"
+					preview.Hostname = "Kora demo server"
+					preview.GameBuild = "3095 (example)"
+					preview.CFXPort = 30120
+					preview.DBPort = 3306
+					preview.TXAdmin = true
+					preview.TXPort = 40120
+					preview.WindowsService = true
+					preview.DBSetup = "new-service"
+					g.review.SetText(guiReview(Plan{Config: preview, ArtifactURL: "Recommended Windows artifact (simulated)", Resources: []Resource{
+						{Path: "[kora]/kora-core", Ref: "example-tag"},
+						{Path: "[kora]/kora-crypto", Ref: "example-tag"},
+					}}))
+				}},
+				{"servers", func() {
+					g.tabs.SetCurrentIndex(1)
+					// Populate only the display model: no real server selection,
+					// filesystem discovery, log watcher or process is started.
+					g.serversBox.SetModel([]string{"kora-demo — Native service running (simulated)", "kora-dev — Native process stopped (simulated)"})
+					g.serversBox.SetCurrentIndex(0)
+					g.watchedText = "[Kora Control] 14:30:00 start requested\n\x1b[36m[FXServer] Preparing server session\x1b[0m\n\x1b[32m[database] Connected to MariaDB\x1b[0m\n\x1b[32m[kora-core] Resource started\x1b[0m\n\x1b[32m[kora-crypto] Resource started\x1b[0m\n\x1b[33m[demo] Example warning for colour preview\x1b[0m\n\x1b[31m[demo] Example error for colour preview\x1b[0m\n\x1b[36m[FXServer] Listening on port 30120 TCP + UDP\x1b[0m\n[Kora Control] 14:30:05 start completed"
+					g.renderWatchedLogs()
+				}},
+				{"filtered-logs", func() { g.logFilter.SetText("kora") }},
+			}
+			for _, scene := range scenes {
+				g.window.Synchronize(scene.setup)
+				time.Sleep(500 * time.Millisecond)
+				name := scene.name
+				g.window.Synchronize(func() {
+					saveControlScreenshot(t, g.window, filepath.Join(filepath.Dir(target), "kora-control-"+name+".png"))
+				})
+			}
+		}
+		g.window.Synchronize(func() { g.window.Close() })
 	}()
 	g.window.Run()
 }
@@ -150,4 +166,39 @@ func controlScreenshot(window *walk.MainWindow) (*walk.Bitmap, error) {
 		return nil, fmt.Errorf("cannot capture native window")
 	}
 	return bitmap, nil
+}
+
+// Screenshot the real desktop surface after the UI thread has painted the scene.
+// Synthetic fixture values are labelled on every screen.
+func saveControlScreenshot(t *testing.T, window *walk.MainWindow, target string) {
+	t.Helper()
+	bitmap, err := controlScreenshot(window)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer bitmap.Dispose()
+	img, err := bitmap.ToImage()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	for i := 3; i < len(img.Pix); i += 4 {
+		img.Pix[i] = 255
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		t.Error(err)
+		return
+	}
+	f, err := os.Create(target)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Error(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Error(err)
+	}
 }
