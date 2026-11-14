@@ -172,6 +172,9 @@ func controlScreenshot(window *walk.MainWindow) (*walk.Bitmap, error) {
 // Synthetic fixture values are labelled on every screen.
 func saveControlScreenshot(t *testing.T, window *walk.MainWindow, target string) {
 	t.Helper()
+	// Page changes invalidate nested native controls independently. Flush the
+	// entire window tree before reading desktop pixels.
+	win.RedrawWindow(window.Handle(), nil, 0, win.RDW_INVALIDATE|win.RDW_ERASE|win.RDW_ALLCHILDREN|win.RDW_UPDATENOW|win.RDW_FRAME)
 	bitmap, err := controlScreenshot(window)
 	if err != nil {
 		t.Error(err)
