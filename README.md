@@ -61,13 +61,13 @@ Both paths require Git and a Cfx.re username and [license key](https://portal.cf
 
 1. Install [Git for Windows](https://git-scm.com/install/windows) and the
    [Microsoft Visual C++ x64 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
-2. Download `kora_installer.exe` and its `.sha256` file from the
+2. Download `kora-control.exe` and its `.sha256` file from the
    [releases page](https://github.com/KoraFiveM/kora_installer/releases).
    The native Windows asset is introduced by this change; older Linux-only
-   releases do not contain it. Compare `Get-FileHash .\kora_installer.exe -Algorithm SHA256`
+   releases do not contain it. Compare `Get-FileHash .\kora-control.exe -Algorithm SHA256`
    with the published checksum.
 3. Open PowerShell **as Administrator** when installing a new database service
-   or enabling the optional FXServer service. Run `.\kora_installer.exe`.
+   or enabling the optional FXServer service. Run `.\kora-control.exe`.
 4. Choose a parent folder and a new directory name. Existing folders are never
    reused. The wizard installs Windows FXServer artifacts and Git resource clones.
 5. Choose **new-service** for a separate local MariaDB service (default), or
@@ -170,7 +170,7 @@ kora
 GitHub Actions builds both Linux and native Windows binaries **inside Docker**,
 then publishes binaries, ZIPs and SHA-256 checksums for each `kora-v*` release.
 This build container is not a Windows runtime dependency. The shell bootstrap
-installs the Linux binary; Windows users download `kora_installer.exe` instead.
+installs the Linux binary; Windows users can download `kora-control.exe` for the desktop app or `kora_installer.exe` for the CLI.
 
 Other bootstrap examples:
 
