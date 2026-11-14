@@ -6,6 +6,34 @@ Both interfaces share the same installation, validation and server-management co
 
 ## Windows desktop app
 
+![Kora Control on Windows with dark inputs and buttons in the server setup wizard](docs/kora-control-windows.png)
+
+*Captured from the native Windows app using simulated setup values.*
+
+<details>
+<summary>More screenshots: database setup, review, and server logs</summary>
+
+**Database and startup** — choose a new MariaDB service or an existing database.
+
+![Kora Control database setup and Windows service options](docs/kora-control-database.png)
+
+**Review before installing** — check the destination, ports and resource versions.
+
+![Kora Control installation review with simulated resource versions](docs/kora-control-review.png)
+
+**Your servers** — server controls alongside coloured logs and operation records.
+
+![Kora Control server management with coloured demonstration logs](docs/kora-control-servers.png)
+
+**Filter logs** — narrow the view without changing the saved log.
+
+![Kora Control logs filtered to Kora entries](docs/kora-control-filtered-logs.png)
+
+All screenshots show native Windows controls with simulated values; no real
+servers, database services or credentials were used for these captures.
+
+</details>
+
 Build with `task build:gui`, then double-click `dist/kora-control.exe`. Tagged
 releases built with this workflow include `kora-control.exe` and its SHA-256
 checksum, alongside the existing CLI. Older releases may contain only the CLI.
@@ -31,9 +59,39 @@ anything. If installation failed, correct the issue and choose a new directory.
 If only startup failed, use **Your servers** to inspect logs and retry Start.
 Cancelling readiness monitoring does not stop an already started server.
 
-Control opens **Your servers** automatically when native installations are found.\n**Your servers** discovers native installations and provides Start, Stop, Restart,
-logs, folder access and separately staged resource updates. Multiple servers keep
+Control opens **Your servers** automatically when native installations are found.
+**Your servers** discovers native installations and provides Start, Stop, Restart,
+live coloured logs with a case-insensitive filter, folder access and backed-up
+Kora resource updates. Start, Stop and Restart append operation records to the
+server log while the viewer continues watching. Multiple servers keep
 their own folders, ports and databases. Stopping FiveM preserves the database.
+
+### Update safely from the desktop app
+
+Choose **Back up and update Kora resources**, select a backup parent folder outside
+this server, then confirm the downtime warning. Control checks repositories for
+local edits before stopping FiveM. It creates a new private `kora-backup-*` folder
+containing resources and their Git histories, configuration, runtime state and a
+`database.sql` dump. Backups contain passwords and license keys; keep them private.
+Only a backup with `backup.complete` is complete. Failed backups remain available
+for inspection and prevent resource changes.
+
+The dump uses the installed MariaDB client, or `mariadb-dump`/`mysqldump` on PATH
+for an existing database service. The dedicated service uses its retained private
+administrator credentials. An existing database account needs privileges to dump
+its database, views, triggers, routines and events. The
+[MariaDB single-transaction dump](https://mariadb.com/docs/server/clients-and-utilities/backup-restore-and-import-clients/mariadb-dump)
+protects transactional tables; keep other writers and schema changes stopped
+during backup. Database files are never copied from a running database service.
+
+Only Git repositories owned by `KoraFiveM` are updated. Local changes block the
+update with a warning. Control uses the existing catalog/tag resolver, preserves
+Git history and ignored files, and refuses backwards/divergent updates or file
+collisions. All new copies must be ready before activation. Previous resource
+folders remain in `control-update-*/previous-*` for recovery. FiveM stays stopped
+on success or failure after stopping; review the result and use **Start** when
+ready. No schema migrations or automatic database restores run. The TUI's separate
+staging workflow remains available.
 
 The app uses native Windows controls with Kora charcoal/lime branding, keyboard
 navigation, standard paste, a folder picker and a DPI-aware manifest. It uses

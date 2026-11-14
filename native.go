@@ -255,7 +255,9 @@ func nativeSession(root string) (*exec.Cmd, error) {
 	cmd.Args = append(cmd.Args, args...)
 	return cmd, nil
 }
-func nativeLogs(root string) string {
+func nativeLogs(root string) string { return ansi.Strip(nativeColoredLogs(root)) }
+
+func nativeColoredLogs(root string) string {
 	f, e := os.Open(filepath.Join(root, "runtime", "server.log"))
 	if e != nil {
 		return ""
@@ -265,11 +267,17 @@ func nativeLogs(root string) string {
 		f.Seek(-16384, io.SeekEnd)
 	}
 	b, _ := io.ReadAll(io.LimitReader(f, 16384))
-	text := ansi.Strip(string(b))
+	text := string(b)
 	values, _ := readEnvironment(root)
 	for key, value := range values {
 		if value != "" && (strings.Contains(key, "PASSWORD") || strings.Contains(key, "LICENSE_KEY")) {
-			text = strings.ReplaceAll(text, value, "[redacted]")
+			lines := strings.Split(text, "\n")
+			for i, line := range lines {
+				if strings.Contains(ansi.Strip(line), value) {
+					lines[i] = strings.ReplaceAll(ansi.Strip(line), value, "[redacted]")
+				}
+			}
+			text = strings.Join(lines, "\n")
 		}
 	}
 	return text

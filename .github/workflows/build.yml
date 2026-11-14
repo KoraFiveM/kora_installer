@@ -45,7 +45,7 @@ jobs:
         if: runner.os == 'Windows' && always()
         with:
           name: kora-control-preview
-          path: ${{ runner.temp }}/kora-control.png
+          path: ${{ runner.temp }}/kora-control*.png
           if-no-files-found: warn
       - run: go vet ./...
       - run: python -m unittest discover -s assets -p 'test_*.py' -v

@@ -23,28 +23,33 @@ import (
 )
 
 type setupGUI struct {
-	tabs                                     *walk.TabWidget
-	scanned                                  bool
-	window                                   *walk.MainWindow
-	pages                                    [6]*walk.Composite
-	heading, status                          *walk.Label
-	back, next, cancel                       *walk.PushButton
-	bar                                      *walk.ProgressBar
-	logs, checks, review, result, serverInfo *walk.TextEdit
-	edits                                    map[string]**walk.LineEdit
-	choices                                  map[string]**walk.ComboBox
-	tx, service, report, secrets, start      *walk.CheckBox
-	existing                                 *walk.Composite
-	manager                                  *walk.ScrollView
-	serversBox                               *walk.ComboBox
-	servers                                  []Server
-	config                                   Config
-	plan                                     Plan
-	page                                     int
-	busy, checked, complete                  bool
-	folder                                   string
-	cancelWork                               context.CancelFunc
-	logText                                  string
+	logFilter                           *walk.LineEdit
+	watchCancel                         context.CancelFunc
+	watchedText                         string
+	tabs                                *walk.TabWidget
+	scanned                             bool
+	window                              *walk.MainWindow
+	pages                               [6]*walk.Composite
+	heading, status                     *walk.Label
+	back, next, cancel                  *walk.PushButton
+	bar                                 *walk.ProgressBar
+	logs, checks, review, result        *walk.TextEdit
+	serverInfo                          *richLog
+	logHost                             *walk.Composite
+	edits                               map[string]**walk.LineEdit
+	choices                             map[string]**walk.ComboBox
+	tx, service, report, secrets, start *walk.CheckBox
+	existing                            *walk.Composite
+	manager                             *walk.ScrollView
+	serversBox                          *walk.ComboBox
+	servers                             []Server
+	config                              Config
+	plan                                Plan
+	page                                int
+	busy, checked, complete             bool
+	folder                              string
+	cancelWork                          context.CancelFunc
+	logText                             string
 }
 
 func launchGUI(c Config) (bool, int) {
@@ -148,7 +153,7 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 							link("Create / find my server license at portal.cfx.re", "https://portal.cfx.re/"),
 							guiLabel("Sign in, register a server, and paste its license above. Ctrl+V and right-click Paste work."),
 							g.input("cfx-port", "FiveM port (TCP + UDP)", strconv.Itoa(c.CFXPort), false),
-							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, AssignTo: &g.tx, Text: "Enable txAdmin — optional browser administration", Checked: c.TXAdmin},
+							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(35, 38, 34)}, AssignTo: &g.tx, Text: "Enable txAdmin — optional browser administration", Checked: c.TXAdmin},
 							g.input("tx-port", "txAdmin port", strconv.Itoa(c.TXPort), false)),
 						page(2,
 							guiLabel("Recommended: let Kora create a private MariaDB service. No database expertise needed."),
@@ -160,7 +165,7 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 								g.input("db-host", "Database address", c.DBHost, false), g.input("db-admin", "Administrator username", c.DBAdmin, false), g.input("db-admin-password", "Administrator password", c.DBAdminPassword, true),
 								guiLabel("Kora creates a fresh database and account. Existing credentials are never reset."),
 							}},
-							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, AssignTo: &g.service, Text: "Start this FiveM server automatically with Windows", Checked: c.WindowsService},
+							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(35, 38, 34)}, AssignTo: &g.service, Text: "Start this FiveM server automatically with Windows", Checked: c.WindowsService},
 							guiLabel("Without automatic startup, use Your servers to start and stop it. Database data stays intact.")),
 						page(3,
 							guiLabel("You can leave everything here unchanged. Latest Kora releases and recommended FiveM artifacts are the defaults."),
@@ -169,13 +174,13 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 							d.PushButton{Text: "Browse for a custom catalog or recipe…", OnClicked: func() { g.browse("source-path", false) }},
 							g.choice("game-build", "Game build", []string{c.GameBuild}, 0), g.choice("artifact", "FXServer artifact", []string{c.Artifact}, 0), g.choice("kora-tag", "Kora version", []string{c.KoraTag}, 0),
 							d.PushButton{Text: "Refresh available versions", OnClicked: g.refreshVersions},
-							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, AssignTo: &g.report, Text: "Save report.json (no credentials)", Checked: c.Report},
-							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, AssignTo: &g.secrets, Text: "Also save secrets.json (contains passwords; keep private)", Checked: c.Secrets},
+							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(35, 38, 34)}, AssignTo: &g.report, Text: "Save report.json (no credentials)", Checked: c.Report},
+							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(35, 38, 34)}, AssignTo: &g.secrets, Text: "Also save secrets.json (contains passwords; keep private)", Checked: c.Secrets},
 							guiLabel("Recipes are validated before installation; unsupported actions stop with an explanation.")),
 						page(4,
 							guiLabel("Review the exact versions and destination. No server files have been installed yet."),
 							d.TextEdit{AssignTo: &g.review, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 250}},
-							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(245, 245, 245)}, AssignTo: &g.start, Text: "Start the server when installation finishes", Checked: true},
+							d.CheckBox{Background: d.SolidColorBrush{Color: walk.RGB(35, 38, 34)}, AssignTo: &g.start, Text: "Start the server when installation finishes", Checked: true},
 							guiLabel("Install creates files and a fresh database. Failed installs stay available for inspection.")),
 						page(5,
 							d.TextEdit{AssignTo: &g.result, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 230}},
@@ -200,7 +205,8 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 						guiLabel("Manage existing native Windows servers. No delete or reset buttons."),
 						d.Composite{Layout: d.HBox{}, Children: []d.Widget{d.PushButton{Text: "Find my servers", OnClicked: g.findServers}, d.PushButton{Text: "Find in another folder…", OnClicked: g.findOther}}},
 						d.ComboBox{AssignTo: &g.serversBox, OnCurrentIndexChanged: g.selectServer},
-						d.TextEdit{AssignTo: &g.serverInfo, ReadOnly: true, VScroll: true, MinSize: d.Size{Height: 200}},
+						d.LineEdit{AssignTo: &g.logFilter, CueBanner: "Filter logs…", OnTextChanged: g.renderWatchedLogs},
+						d.Composite{AssignTo: &g.logHost, Layout: d.VBox{MarginsZero: true}, MinSize: d.Size{Height: 200}},
 						d.Composite{Layout: d.HBox{}, Children: []d.Widget{
 							d.PushButton{Text: "Start", OnClicked: func() { g.serverAction("start") }}, d.PushButton{Text: "Stop", OnClicked: func() { g.serverAction("stop") }}, d.PushButton{Text: "Restart", OnClicked: func() { g.serverAction("restart") }}, d.PushButton{Text: "View logs", OnClicked: func() { g.serverAction("logs") }}, d.PushButton{Text: "Open folder", OnClicked: func() {
 								if s, ok := g.selected(); ok {
@@ -208,8 +214,8 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 								}
 							}},
 						}},
-						d.PushButton{Text: "Stage resource updates in a NEW folder…", OnClicked: func() { g.serverAction("update") }},
-						guiLabel("Updates keep Git history and never replace live resources. Review the staged folder before adopting it."),
+						d.PushButton{Text: "Back up and update Kora resources…", OnClicked: func() { g.serverAction("update") }},
+						guiLabel("Stops FiveM, backs up files and database, then updates clean Kora repositories."),
 					}},
 				),
 			}},
@@ -227,6 +233,10 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 	if err != nil {
 		return nil, err
 	}
+	g.serverInfo, err = newRichLog(g.logHost)
+	if err != nil {
+		return nil, err
+	}
 	g.combo("db-setup").CurrentIndexChanged().Attach(func() { g.existing.SetVisible(g.combo("db-setup").CurrentIndex() == 1) })
 	g.window.Closing().Attach(func(cancel *bool, _ walk.CloseReason) {
 		if g.busy {
@@ -234,6 +244,32 @@ func newSetupGUI(c Config) (*setupGUI, error) {
 			g.notice("An operation is still running", "Use Cancel current operation and wait before closing. Created files and database data are retained.")
 		}
 	})
+	// Use a consistent charcoal surface for editable and read-only text.
+	brush, brushErr := walk.NewSolidColorBrush(walk.RGB(35, 38, 34))
+	if brushErr != nil {
+		return nil, brushErr
+	}
+	g.window.Disposing().Attach(func() {
+		if g.watchCancel != nil {
+			g.watchCancel()
+		}
+		brush.Dispose()
+	})
+	g.logFilter.SetBackground(brush)
+	g.logFilter.SetTextColor(walk.RGB(235, 240, 230))
+	for _, slot := range g.edits {
+		(*slot).SetBackground(brush)
+		(*slot).SetTextColor(walk.RGB(235, 240, 230))
+	}
+	for _, edit := range []*walk.TextEdit{g.logs, g.checks, g.review, g.result} {
+		edit.SetBackground(brush)
+		edit.SetTextColor(walk.RGB(235, 240, 230))
+	}
+	for _, slot := range g.choices {
+		themeControl((*slot).Handle())
+	}
+	themeControl(g.serversBox.Handle())
+	win.EnumChildWindows(g.window.Handle(), controlThemeCallback, 0)
 	g.fitToScreen()
 	return g, nil
 }
@@ -484,7 +520,7 @@ func (g *setupGUI) task(title string, work func(context.Context, func(Progress))
 	g.bar.SetMarqueeMode(true)
 	g.next.SetEnabled(false)
 	g.back.SetEnabled(false)
-	g.manager.SetEnabled(false)
+	g.manager.SetEnabled(true)
 	for _, p := range g.pages {
 		p.SetEnabled(false)
 	}
@@ -535,7 +571,7 @@ func (g *setupGUI) task(title string, work func(context.Context, func(Progress))
 				g.status.SetText("Needs attention — see details")
 				g.logText += "\r\n" + text
 				g.logs.SetText(g.logText)
-				g.notice("Let's fix this", text)
+				g.notice("Operation stopped", text)
 			} else {
 				g.status.SetText("Done — ready for the next step")
 				g.bar.SetValue(100)
@@ -639,9 +675,13 @@ func (g *setupGUI) selectServer() {
 	if i >= 0 && i < len(g.servers) {
 		s := g.servers[i]
 		g.serverInfo.SetText(s.Path + "\r\n" + s.Status + "\r\n" + s.DockerState)
+		g.startLogWatch(s.Path)
 	}
 }
 func (g *setupGUI) serverAction(action string) {
+	if g.busy {
+		return
+	}
 	s, ok := g.selected()
 	if !ok {
 		return
@@ -650,12 +690,31 @@ func (g *setupGUI) serverAction(action string) {
 		g.notice("Incomplete installation", "This folder is available for inspection only. Correct the problem and create a new installation.")
 		return
 	}
-	questions := map[string]string{"start": "Start this server?", "stop": "Stop this FiveM server? Database data stays intact.", "restart": "Restart this FiveM server? Connected players will disconnect.", "update": "Clone updated resources into a new staging folder? Live resources will stay unchanged."}
+	backupParent := ""
+	if action == "update" {
+		dialog := walk.FileDialog{Title: "Choose a backup folder outside this server"}
+		chosen, err := dialog.ShowBrowseFolder(g.window)
+		if err != nil {
+			g.notice("Backup folder", err.Error())
+			return
+		}
+		if !chosen {
+			return
+		}
+		backupParent = dialog.FilePath
+	}
+	questions := map[string]string{"start": "Start this server?", "stop": "Stop this FiveM server? Database data stays intact.", "restart": "Restart this FiveM server? Connected players will disconnect.", "update": "FiveM will stop and players will disconnect. Resources, configuration and a database dump will be backed up before updating Kora resources. The server stays stopped afterwards."}
 	if action != "logs" && walk.MsgBox(g.window, "Confirm "+action, s.Path+"\r\n\r\n"+questions[action], walk.MsgBoxYesNo|walk.MsgBoxIconQuestion) != walk.DlgCmdYes {
 		return
 	}
+	g.startLogWatch(s.Path)
 	g.task("Server: "+action, func(ctx context.Context, emit func(Progress)) (func(), error) {
 		var err error
+		if action != "logs" {
+			if e := recordControlOperation(s.Path, action+" requested"); e != nil {
+				return nil, e
+			}
+		}
 		message := ""
 		switch action {
 		case "start":
@@ -671,15 +730,40 @@ func (g *setupGUI) serverAction(action string) {
 			message = nativeLogs(s.Path)
 		case "update":
 			var p UpdatePlan
-			p, err = prepareUpdate(ctx, s, "latest", "", emit)
+			p, err = prepareUpdateScope(ctx, s, "latest", "", emit, true)
 			if err == nil {
-				r := stageUpdate(ctx, p, emit)
-				err = r.Err
-				message = "Staged resources: " + r.Folder + "\r\nReview before adopting; live resources have not changed."
+				var backup string
+				backup, err = applyControlUpdate(ctx, p, backupParent, emit, func(ctx context.Context, root string) error {
+					if e := nativeAction(ctx, root, "stop"); e != nil {
+						return e
+					}
+					if !strings.HasSuffix(nativeStatus(root), " stopped") {
+						return fmt.Errorf("server stop could not be verified")
+					}
+					return nil
+				}, dumpServerDatabase)
+				message = "Backup: " + backup + "\r\nServer remains stopped."
+				if err != nil {
+					err = fmt.Errorf("%w\nBackup / retained partial backup: %s", err, backup)
+				}
+			}
+		}
+		if action != "logs" {
+			outcome := " completed"
+			if err != nil {
+				outcome = " failed"
+			}
+			if e := recordControlOperation(s.Path, action+outcome); err == nil {
+				err = e
 			}
 		}
 		state := nativeStatus(s.Path)
-		return func() { g.serverInfo.SetText(s.Path + "\r\n" + state + "\r\n\r\n" + message) }, err
+		return func() {
+			g.status.SetText(state + " — " + message)
+			if action == "update" && err == nil {
+				g.notice("Kora resources updated", message)
+			}
+		}, err
 	})
 }
 func (g *setupGUI) openServerLink(kind string) {
@@ -777,4 +861,65 @@ func (g *setupGUI) populateServers(servers []Server) {
 	} else {
 		g.serverInfo.SetText("No native Windows servers found. Install one, or choose Find in another folder.")
 	}
+}
+
+func recordControlOperation(root, message string) error {
+	if !regularFile(filepath.Join(root, "install.complete")) {
+		return fmt.Errorf("installation is incomplete")
+	}
+	dir := filepath.Join(root, "runtime")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	if st, err := os.Lstat(dir); err != nil || !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("runtime must be a real directory")
+	}
+	if st, err := os.Lstat(filepath.Join(dir, "server.log")); err == nil && !st.Mode().IsRegular() {
+		return fmt.Errorf("server.log must be a regular file")
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "server.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("cannot record operation: %w", err)
+	}
+	_, err = fmt.Fprintf(f, "[Kora Control] %s %s\n", time.Now().Format(time.RFC3339), message)
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+func (g *setupGUI) renderWatchedLogs() {
+	if g.serverInfo == nil || g.logFilter == nil {
+		return
+	}
+	g.serverInfo.Render(g.watchedText, g.logFilter.Text())
+}
+func (g *setupGUI) startLogWatch(root string) {
+	if g.watchCancel != nil {
+		g.watchCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	g.watchCancel = cancel
+	g.watchedText = ""
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			text := nativeColoredLogs(root)
+			if ctx.Err() != nil {
+				return
+			}
+			g.window.Synchronize(func() {
+				if ctx.Err() == nil && text != g.watchedText {
+					g.watchedText = text
+					g.renderWatchedLogs()
+				}
+			})
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 }
