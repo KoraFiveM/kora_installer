@@ -1,4 +1,4 @@
-# Kora installer development
+# Kora Control development
 
 Read README.md and CONTRIBUTING.md before changing this repository.
 This is the independent source repository for the `kora` development-server CLI.

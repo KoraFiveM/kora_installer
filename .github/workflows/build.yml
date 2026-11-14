@@ -1,4 +1,4 @@
-name: Kora installer
+name: Kora Control
 on:
   push:
     branches: ['**']

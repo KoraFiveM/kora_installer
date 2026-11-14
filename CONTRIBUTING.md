@@ -1,6 +1,6 @@
 # Contributing
 
-Keep changes focused on the installer and development-server management. Preserve
+Keep changes focused on Kora Control and development-server management. Preserve
 existing installations and databases. Test using temporary fixtures, without
 starting real servers or modifying user resources.
 
